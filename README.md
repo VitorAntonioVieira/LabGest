@@ -1,4 +1,4 @@
-# 🏛️ LabGest — Living Lab CTPP (UNIFESP)
+# 🏛️ LabGest — LabTechTPP (UNIFESP)
 
 <div align="center">
 
@@ -216,6 +216,6 @@ Para entender o planejamento estratégico, fases de implementação e regras de 
 
 ## 📄 Licença e Créditos Institucionais
 
-Desenvolvido para o **Living Lab CTPP — Centro de Tecnologia e Políticas Públicas**  
+Desenvolvido para o **LabTechPP — Centro de Tecnologia e Políticas Públicas**  
 **Universidade Federal de São Paulo (UNIFESP)**  
 Todos os direitos reservados. Uso voltado para ensino, pesquisa e extensão universitária.
