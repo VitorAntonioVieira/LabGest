@@ -1,0 +1,61 @@
+import React from "react";
+import { getServerSession } from "next-auth";
+import { authOptions } from "@/lib/auth";
+import { prisma } from "@/lib/prisma";
+import { Sidebar } from "@/components/layout/sidebar";
+import { Header } from "@/components/layout/header";
+
+export default async function DashboardLayout({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
+  const session = await getServerSession(authOptions);
+
+  // Busca dinâmica dos braços ativos e contadores reais no banco de dados
+  const [activeWorkspaces, activeCount, pendingCount] = await Promise.all([
+    prisma.workspace.findMany({
+      where: { status: "APPROVED" },
+      select: { id: true, name: true, slug: true },
+      orderBy: { createdAt: "asc" },
+      take: 6,
+    }),
+    prisma.workspace.count({
+      where: { status: "APPROVED" },
+    }),
+    prisma.workspace.count({
+      where: { status: "PENDING" },
+    }),
+  ]);
+
+  return (
+    <div className="flex h-screen w-full overflow-hidden bg-background">
+      {/* Sidebar 100% Dinâmica com Dados Reais da Sessão e do Banco */}
+      <Sidebar
+        currentUser={
+          session?.user
+            ? {
+                name: session.user.name || "Pesquisador UNIFESP",
+                email: session.user.email || "",
+                role: session.user.role || "STUDENT",
+                avatarUrl: session.user.image || undefined,
+              }
+            : undefined
+        }
+        workspaces={activeWorkspaces}
+        activeWorkspacesCount={activeCount}
+        pendingApprovalsCount={pendingCount}
+      />
+
+      {/* Conteúdo Principal com Barra Superior e Scroll Independente */}
+      <div className="flex flex-1 flex-col h-full overflow-hidden min-w-0">
+        <Header />
+        <main className="flex-1 overflow-y-auto p-6 md:p-8 min-h-0">
+          <div className="max-w-7xl w-full mx-auto space-y-8">
+            {children}
+          </div>
+        </main>
+      </div>
+    </div>
+  );
+}

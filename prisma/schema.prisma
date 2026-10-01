@@ -1,0 +1,385 @@
+generator client {
+  provider      = "prisma-client-js"
+  binaryTargets = ["native", "linux-musl-openssl-3.0.x"]
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ==========================================
+// 1. ENUMS DO SISTEMA (RBAC & STATUS)
+// ==========================================
+
+enum UserRole {
+  PROFESSOR // Administrador Geral: gerencia tudo, aprova workspaces, emite certificados
+  LEADER    // Líder de Pesquisa: gerencia Kanban e membros do seu Workspace
+  STUDENT   // Integrante Base: executa tarefas, aponta horas e redige anotações
+}
+
+enum UserStatus {
+  PENDING             // Fez login OAuth, mas não preencheu RA e Telefone
+  WAITING_APPROVAL    // Dados enviados, aguardando aprovação na Sala de Espera
+  ACTIVE              // Homologado pelo Professor (acesso irrestrito)
+  REJECTED            // Recusado pela coordenação
+  SUSPENDED           // Acesso temporariamente revogado
+}
+
+enum WorkspaceStatus {
+  PENDING   // Criado recentemente pelo usuário, aguardando aprovação do Professor
+  APPROVED  // Ativo para colaboração
+  REJECTED  // Recusado com justificativa
+  ARCHIVED  // Concluído ou desativado
+}
+
+enum WorkspaceMemberRole {
+  OWNER     // Criador / Coordenador direto do braço
+  LEADER    // Líder designado
+  MEMBER    // Pesquisador / Estudante ativo
+  VIEWER    // Observador
+}
+
+enum TaskPriority {
+  LOW
+  MEDIUM
+  HIGH
+  URGENT
+}
+
+enum TimeEntryStatus {
+  PENDING   // Aguardando validação (se configurado fluxo de aprovação)
+  APPROVED  // Homologado para relatórios e certificados
+  REJECTED  // Necessita ajuste
+}
+
+enum DocType {
+  WORKSPACE // Caderno colaborativo compartilhado com o braço de pesquisa
+  PERSONAL  // Caderno pessoal privado do pesquisador/estudante
+}
+
+// ==========================================
+// 2. AUTENTICAÇÃO (NEXTAUTH / AUTH.JS)
+// ==========================================
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String? @db.Text
+  access_token      String? @db.Text
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String? @db.Text
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+  @@index([userId])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+}
+
+// ==========================================
+// 3. USUÁRIOS
+// ==========================================
+
+model User {
+  id            String      @id @default(cuid())
+  name          String?
+  email         String?     @unique
+  emailVerified DateTime?
+  image         String?
+  role          UserRole    @default(STUDENT)
+  status        UserStatus  @default(PENDING) // Controle de ciclo de vida e sala de espera
+  academicId    String?     // Matrícula / RA Unifesp
+  phone         String?     // WhatsApp / Telefone de contato
+  course        String?     // Curso / Programa de Pós-Graduação
+  bio           String?     @db.Text
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+
+  // Auditoria da aprovação de membros
+  approvedById  String?
+  approvedBy    User?       @relation("UserApprovals", fields: [approvedById], references: [id])
+  approvedUsers User[]      @relation("UserApprovals")
+  approvedAt    DateTime?
+
+  // Relações NextAuth
+  accounts      Account[]
+  sessions      Session[]
+
+  // Relações com Workspaces
+  requestedWorkspaces  Workspace[]          @relation("WorkspaceRequester")
+  approvedWorkspaces   Workspace[]          @relation("WorkspaceApprover")
+  workspaceMemberships WorkspaceMember[]
+
+  // Relações com Tarefas e Kanban
+  createdTasks         Task[]               @relation("TaskCreator")
+  assignedTasks        TaskAssignee[]
+  taskComments         TaskComment[]
+
+  // Relações com Apontamento de Horas (Time Tracking)
+  timeEntries          TimeEntry[]
+
+  // Relações com Documentos (Notion-like)
+  documents            Document[]
+
+  @@index([status])
+  @@index([role])
+  @@index([email])
+}
+
+// ==========================================
+// 4. ESPAÇOS DE TRABALHO (WORKSPACES)
+// ==========================================
+
+model Workspace {
+  id             String          @id @default(cuid())
+  name           String
+  slug           String          @unique
+  description    String?         @db.Text
+  coverImage     String?
+  department     String?         // Ex: "Biotecnologia", "Inteligência Artificial", "Farmácia"
+  status         WorkspaceStatus @default(PENDING)
+  rejectionNotes String?         @db.Text
+  
+  requestedById  String
+  requestedBy    User            @relation("WorkspaceRequester", fields: [requestedById], references: [id], onDelete: Restrict)
+  
+  approvedById   String?
+  approvedBy     User?           @relation("WorkspaceApprover", fields: [approvedById], references: [id], onDelete: SetNull)
+  approvedAt     DateTime?
+
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+
+  // Filhos do Workspace
+  members        WorkspaceMember[]
+  columns        KanbanColumn[]
+  tasks          Task[]
+  tags           Tag[]
+  documents      Document[]
+  timeEntries    TimeEntry[]
+
+  @@index([status])
+  @@index([requestedById])
+  @@index([approvedById])
+}
+
+model WorkspaceMember {
+  id          String              @id @default(cuid())
+  workspaceId String
+  userId      String
+  role        WorkspaceMemberRole @default(MEMBER)
+  joinedAt    DateTime            @default(now())
+
+  workspace   Workspace           @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  user        User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([workspaceId, userId])
+  @@index([userId])
+  @@index([workspaceId])
+}
+
+// ==========================================
+// 5. KANBAN: COLUNAS, TAREFAS, TAGS E CHAT
+// ==========================================
+
+model KanbanColumn {
+  id          String    @id @default(cuid())
+  workspaceId String
+  title       String    // Ex: "A Fazer", "Em Andamento", "Revisão", "Concluído"
+  order       Int       @default(0)
+  color       String?   // Código de cor hex ou classe tailwind para identificação
+  isDefault   Boolean   @default(false)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  tasks       Task[]
+
+  @@index([workspaceId, order])
+}
+
+model Task {
+  id              String        @id @default(cuid())
+  workspaceId     String
+  columnId        String
+  title           String
+  description     String?       @db.Text
+  priority        TaskPriority  @default(MEDIUM)
+  allowSelfAssign Boolean       @default(true) // Configuração de auto-inserção
+  order           Int           @default(0)
+  dueDate         DateTime?
+  completedAt     DateTime?
+
+  createdById     String
+  createdBy       User          @relation("TaskCreator", fields: [createdById], references: [id], onDelete: Restrict)
+
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+
+  workspace       Workspace     @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  column          KanbanColumn  @relation(fields: [columnId], references: [id], onDelete: Cascade)
+  
+  assignees       TaskAssignee[]
+  tags            TaskTag[]
+  comments        TaskComment[]
+  timeEntries     TimeEntry[]
+
+  @@index([workspaceId, columnId])
+  @@index([dueDate])
+  @@index([createdById])
+}
+
+model TaskAssignee {
+  taskId     String
+  userId     String
+  assignedAt DateTime @default(now())
+
+  task       Task     @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([taskId, userId])
+  @@index([userId])
+  @@index([taskId])
+}
+
+model Tag {
+  id          String    @id @default(cuid())
+  workspaceId String
+  name        String
+  color       String    @default("#0E4734") // Cor padrão do Lab CTPP
+  createdAt   DateTime  @default(now())
+
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  tasks       TaskTag[]
+
+  @@unique([workspaceId, name])
+  @@index([workspaceId])
+}
+
+model TaskTag {
+  taskId String
+  tagId  String
+
+  task   Task @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  tag    Tag  @relation(fields: [tagId], references: [id], onDelete: Cascade)
+
+  @@id([taskId, tagId])
+  @@index([tagId])
+  @@index([taskId])
+}
+
+model TaskComment {
+  id        String   @id @default(cuid())
+  taskId    String
+  userId    String
+  content   String   @db.Text
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  task      Task     @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([taskId])
+  @@index([userId])
+}
+
+// ==========================================
+// 6. APONTAMENTO DE HORAS (TIME TRACKING)
+// ==========================================
+
+model TimeEntry {
+  id              String          @id @default(cuid())
+  taskId          String
+  userId          String
+  workspaceId     String
+  date            DateTime        // Data em que as horas foram executadas
+  durationMinutes Int             // Duração em minutos (ex: 90 = 1h30m)
+  summary         String          @db.Text // Descrição do que foi realizado
+  status          TimeEntryStatus @default(APPROVED)
+  
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+
+  task            Task            @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  user            User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  workspace       Workspace       @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  @@index([userId, date])
+  @@index([workspaceId, date])
+  @@index([taskId])
+}
+
+// ==========================================
+// 7. CADERNO DE ANOTAÇÕES (NOTION-LIKE / BLOCKNOTE)
+// ==========================================
+
+model Document {
+  id          String    @id @default(cuid())
+  title       String    @default("Sem título")
+  icon        String?   // Emoji ou identificador de ícone (ex: 🔬, 🧪, 📑)
+  coverImage  String?
+  content     Json?     // Blocos serializados (BlockNote / Tiptap JSON AST)
+  type        DocType   @default(PERSONAL)
+  isPublished Boolean   @default(false)
+  order       Int       @default(0)
+
+  ownerId     String
+  owner       User      @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+
+  workspaceId String?   // Obrigatório se type == WORKSPACE, nulo se PERSONAL
+  workspace   Workspace? @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  // Auto-relacionamento em árvore para subpáginas infinitas estilo Notion
+  parentId    String?
+  parent      Document? @relation("DocumentTree", fields: [parentId], references: [id], onDelete: Cascade)
+  children    Document[] @relation("DocumentTree")
+
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@index([ownerId, type])
+  @@index([workspaceId])
+  @@index([parentId])
+}
+
+// ==========================================
+// 8. CONFIGURAÇÕES DA PLATAFORMA (WHITE-LABEL)
+// ==========================================
+
+model PlatformSettings {
+  id              String   @id @default("default") // Chave única singleton
+  labName         String   @default("Lab CTPP")
+  institutionName String   @default("UNIFESP")
+  departmentName  String   @default("Living Lab Universitário")
+  primaryColor    String   @default("#0E4330")     // Hex da cor primária ("Lab" verde floresta)
+  secondaryColor  String   @default("#24576C")     // Hex da cor secundária ("CTPP" petróleo)
+  accentColor     String   @default("#1F8A64")     // Hex de destaque
+  logoUrl         String?                          // URL ou caminho do logotipo
+  faviconUrl      String?
+  supportEmail    String?  @default("contato@labctpp.unifesp.br")
+  updatedAt       DateTime @updatedAt
+}

@@ -1,0 +1,56 @@
+services:
+  # ==========================================
+  # Banco de Dados Relacional: PostgreSQL
+  # ==========================================
+  postgres:
+    image: postgres:16-alpine
+    container_name: labgest_postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-labgest_admin}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-labgest_secure_password}
+      POSTGRES_DB: ${POSTGRES_DB:-labgest_db}
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-labgest_admin} -d ${POSTGRES_DB:-labgest_db}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - labgest-network
+
+  # ==========================================
+  # Aplicação Web: Next.js + Prisma
+  # ==========================================
+  web:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: labgest_web
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      DATABASE_URL: "postgresql://${POSTGRES_USER:-labgest_admin}:${POSTGRES_PASSWORD:-labgest_secure_password}@postgres:5432/${POSTGRES_DB:-labgest_db}?schema=public"
+      NEXTAUTH_URL: ${NEXTAUTH_URL:-http://localhost:3000}
+      NEXTAUTH_SECRET: ${NEXTAUTH_SECRET:-your_super_secret_jwt_random_key_here}
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID}
+      GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET}
+      ALLOWED_EMAIL_DOMAINS: ${ALLOWED_EMAIL_DOMAINS:-unifesp.br,aluno.unifesp.br}
+      NODE_ENV: production
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - labgest-network
+
+volumes:
+  postgres_data:
+    driver: local
+
+networks:
+  labgest-network:
+    driver: bridge

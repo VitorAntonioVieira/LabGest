@@ -1,0 +1,105 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    /* Paleta Extraída do Logo Lab CTPP */
+    /* Fundo suave em tom neutro/acadêmico estilo Notion */
+    --background: 210 20% 98.5%;
+    --foreground: 200 40% 12%;
+
+    --card: 0 0% 100%;
+    --card-foreground: 200 40% 12%;
+
+    --popover: 0 0% 100%;
+    --popover-foreground: 200 40% 12%;
+
+    /* Cor Primária: "Lab" + Folhas de Pesquisa (Verde Floresta Acadêmico #0E4330) */
+    --primary: 164 68% 18%;
+    --primary-foreground: 0 0% 100%;
+
+    /* Cor Secundária: "CTPP" (Petróleo / Teal Profundo #24576C) */
+    --secondary: 194 52% 33%;
+    --secondary-foreground: 0 0% 100%;
+
+    /* Tons Silenciosos (Muted) */
+    --muted: 194 18% 95%;
+    --muted-foreground: 194 18% 40%;
+
+    /* Destaques (Accent / Hovers de botões e links) */
+    --accent: 164 45% 94%;
+    --accent-foreground: 164 68% 18%;
+
+    --destructive: 0 84.2% 60.2%;
+    --destructive-foreground: 0 0% 98%;
+
+    --border: 194 18% 88%;
+    --input: 194 18% 88%;
+    --ring: 164 68% 22%;
+
+    --radius: 0.5rem;
+  }
+
+  .dark {
+    /* Modo Escuro Profissional / Linear com undertone verde-floresta */
+    --background: 165 24% 6%;
+    --foreground: 160 15% 96%;
+
+    --card: 165 20% 9%;
+    --card-foreground: 160 15% 96%;
+
+    --popover: 165 20% 9%;
+    --popover-foreground: 160 15% 96%;
+
+    /* Verde Esmeralda Vibrante para Contraste Dark */
+    --primary: 160 60% 45%;
+    --primary-foreground: 165 24% 6%;
+
+    /* Ciano Petróleo Vibrante */
+    --secondary: 194 55% 52%;
+    --secondary-foreground: 165 24% 6%;
+
+    --muted: 165 16% 14%;
+    --muted-foreground: 165 12% 65%;
+
+    --accent: 165 20% 14%;
+    --accent-foreground: 160 60% 55%;
+
+    --destructive: 0 62.8% 45%;
+    --destructive-foreground: 0 0% 98%;
+
+    --border: 165 14% 17%;
+    --input: 165 14% 17%;
+    --ring: 160 60% 45%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground;
+    font-feature-settings: "rlig" 1, "calt" 1;
+  }
+}
+
+/* Scrollbar estilizada estilo Linear / Notion */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: hsl(var(--muted-foreground) / 0.25);
+  border-radius: 9999px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: hsl(var(--muted-foreground) / 0.45);
+}

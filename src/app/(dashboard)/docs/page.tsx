@@ -1,0 +1,102 @@
+import React from "react";
+import Link from "next/link";
+import { redirect } from "next/navigation";
+import { getServerSession } from "next-auth";
+import { authOptions } from "@/lib/auth";
+import { prisma } from "@/lib/prisma";
+import { BookOpen, Plus, FileText, Search, ChevronRight, FolderGit2 } from "lucide-react";
+import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { DocsHeaderActions } from "@/components/docs/docs-header-actions";
+
+export default async function DocsCentralPage() {
+  const session = await getServerSession(authOptions);
+
+  if (!session?.user?.id) {
+    redirect("/login");
+  }
+
+  const userId = session.user.id;
+
+  const documents = await prisma.document.findMany({
+    where: {
+      OR: [{ ownerId: userId }, { type: "WORKSPACE" }],
+    },
+    include: {
+      owner: { select: { name: true } },
+      workspace: { select: { id: true, name: true, slug: true } },
+    },
+    orderBy: { updatedAt: "desc" },
+  });
+
+  const workspaces = await prisma.workspace.findMany({
+    where: { status: "APPROVED" },
+    select: { id: true, name: true },
+    orderBy: { name: "asc" },
+  });
+
+  return (
+    <div className="space-y-8">
+      {/* Header */}
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between border-b border-border pb-6">
+        <div>
+          <div className="flex items-center gap-2 mb-1">
+            <Badge variant="secondary" className="text-xs">
+              Notion-like Docs
+            </Badge>
+          </div>
+          <h1 className="text-2xl font-bold tracking-tight text-foreground sm:text-3xl flex items-center gap-2.5">
+            <BookOpen className="h-7 w-7 text-secondary" />
+            Cadernos de Notas & Documentação Científica
+          </h1>
+          <p className="text-sm text-muted-foreground mt-1">
+            Repositório de protocolos, metodologias experimentais e anotações colaborativas do Living Lab.
+          </p>
+        </div>
+
+        <DocsHeaderActions workspaces={workspaces} label="Nova Página de Notas" />
+      </div>
+
+      {/* Grid de Documentos */}
+      {documents.length === 0 ? (
+        <Card className="border-dashed p-12 text-center bg-card/40">
+          <FileText className="mx-auto h-10 w-10 text-muted-foreground/50 mb-3" />
+          <CardTitle className="text-base font-semibold">Nenhuma nota ou documento cadastrado</CardTitle>
+          <CardDescription className="text-xs max-w-sm mx-auto mt-1">
+            Crie sua primeira página de anotações ou acesse um dos braços de pesquisa para documentar seus experimentos.
+          </CardDescription>
+        </Card>
+      ) : (
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          {documents.map((doc) => (
+            <Card
+              key={doc.id}
+              className="p-4 hover:border-secondary/60 transition-all cursor-pointer shadow-2xs hover:shadow-xs group flex flex-col justify-between"
+            >
+              <div>
+                <div className="flex items-start justify-between">
+                  <span className="text-2xl">{doc.icon || "📄"}</span>
+                  <Badge variant={doc.type === "WORKSPACE" ? "default" : "outline"} className="text-[10px]">
+                    {doc.type === "WORKSPACE" ? doc.workspace?.name || "Workspace" : "Pessoal"}
+                  </Badge>
+                </div>
+                <CardTitle className="text-sm font-semibold mt-3 group-hover:text-secondary transition-colors line-clamp-1">
+                  {doc.title}
+                </CardTitle>
+                <p className="text-[11px] text-muted-foreground mt-1 line-clamp-2">
+                  Documentação e notas de pesquisa sincronizadas na plataforma.
+                </p>
+              </div>
+
+              <div className="pt-3 mt-3 border-t border-border/60 flex items-center justify-between text-[10px] text-muted-foreground">
+                <span>Por {doc.owner?.name || "Pesquisador"}</span>
+                <span>{new Date(doc.updatedAt).toLocaleDateString("pt-BR")}</span>
+              </div>
+            </Card>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
