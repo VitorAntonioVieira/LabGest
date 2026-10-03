@@ -1,4 +1,4 @@
-# 🌿 LabGest CTPP — Living Lab (UNIFESP)
+# 🏛️ LabGest — LabTechTPP (UNIFESP)
 
 > **Plataforma Integrada de Gestão de Pesquisa, Quadros Kanban, Apontamento de Horas e Cadernos Científicos para o Living Lab do Centro de Tecnologia e Políticas Públicas (CTPP) da UNIFESP.**
 
@@ -175,6 +175,6 @@ Para conferir o planejamento detalhado das próximas fases, incluindo a **Fase 5
 
 ## 🏛️ 7. Apoio e Realização
 
-- **Living Lab CTPP — Centro de Tecnologia e Políticas Públicas**
-- **Universidade Federal de São Paulo (UNIFESP)**
-- **Coordenação do Projeto:** Prof. Dr. Evandro Coggo (`evandro.coggo@unifesp.br`)
+Desenvolvido para o **LabTechPP — Centro de Tecnologia e Políticas Públicas**  
+**Universidade Federal de São Paulo (UNIFESP)**  
+Todos os direitos reservados. Uso voltado para ensino, pesquisa e extensão universitária.

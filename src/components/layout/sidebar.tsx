@@ -39,6 +39,12 @@ interface SidebarProps {
   }[];
   activeWorkspacesCount?: number;
   pendingApprovalsCount?: number;
+  brandSettings?: {
+    labName: string;
+    institutionName: string;
+    departmentName: string;
+    logoUrl?: string | null;
+  };
 }
 
 export function Sidebar({
@@ -46,6 +52,7 @@ export function Sidebar({
   workspaces = [],
   activeWorkspacesCount = 0,
   pendingApprovalsCount = 0,
+  brandSettings,
 }: SidebarProps) {
   const pathname = usePathname();
   const { data: session } = useSession();
@@ -108,35 +115,44 @@ export function Sidebar({
     <aside className="h-full w-64 shrink-0 flex flex-col border-r border-border bg-card/95 backdrop-blur z-30 transition-all duration-300">
       {/* 1. Header do Logo Lab CTPP */}
       <div className="flex h-16 items-center justify-between border-b border-border px-5">
-        <Link href="/" className="flex items-center gap-2.5 group">
-          {/* Símbolo Gráfico inspirado no Logo (Livro Foliar + Redes) */}
-          <div className="relative flex h-9 w-9 items-center justify-center rounded-lg bg-primary text-white shadow-sm transition-transform group-hover:scale-105">
-            <svg
-              className="h-5 w-5"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            >
-              {/* Folhas e livro combinados */}
-              <path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H20v20H6.5a2.5 2.5 0 0 1-2.5-2.5Z" />
-              <path d="M6 6h10" />
-              <path d="M6 10h10" />
-              <circle cx="18" cy="4" r="1.5" className="fill-secondary stroke-none" />
-              <circle cx="21" cy="7" r="1.2" className="fill-secondary stroke-none" />
-              <path d="M16 5l2-1 3 3" />
-            </svg>
-          </div>
-
-          <div className="flex flex-col">
-            <div className="flex items-center font-bold tracking-tight text-lg leading-none">
-              <span className="text-primary font-black tracking-normal">Lab</span>
-              <span className="text-secondary ml-1 font-extrabold">CTPP</span>
+        <Link href="/" className="flex items-center gap-2.5 group overflow-hidden">
+          {/* Logotipo Customizado ou Símbolo Padrão */}
+          {brandSettings?.logoUrl ? (
+            <div className="relative flex h-9 w-9 items-center justify-center rounded-lg border border-border/60 bg-muted/20 p-1 shadow-xs transition-transform group-hover:scale-105 shrink-0 overflow-hidden">
+              <img
+                src={brandSettings.logoUrl}
+                alt={brandSettings.labName}
+                className="h-full w-full object-contain"
+              />
             </div>
-            <span className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider mt-0.5">
-              Living Lab • UNIFESP
+          ) : (
+            <div className="relative flex h-9 w-9 items-center justify-center rounded-lg bg-primary text-white shadow-xs transition-transform group-hover:scale-105 shrink-0">
+              <svg
+                className="h-5 w-5"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
+                {/* Folhas e livro combinados */}
+                <path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H20v20H6.5a2.5 2.5 0 0 1-2.5-2.5Z" />
+                <path d="M6 6h10" />
+                <path d="M6 10h10" />
+                <circle cx="18" cy="4" r="1.5" className="fill-secondary stroke-none" />
+                <circle cx="21" cy="7" r="1.2" className="fill-secondary stroke-none" />
+                <path d="M16 5l2-1 3 3" />
+              </svg>
+            </div>
+          )}
+
+          <div className="flex flex-col overflow-hidden">
+            <span className="font-bold tracking-tight text-base leading-none text-foreground truncate">
+              {brandSettings?.labName || "Lab CTPP"}
+            </span>
+            <span className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider mt-1 truncate">
+              {brandSettings?.departmentName || "Living Lab"} • {brandSettings?.institutionName || "UNIFESP"}
             </span>
           </div>
         </Link>

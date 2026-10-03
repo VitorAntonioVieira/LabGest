@@ -123,6 +123,9 @@ stateDiagram-v2
 - [x] Modelo `PlatformSettings` no banco de dados para personalização.
 - [x] Página de configurações institucionais (`/admin/settings`).
 - [x] Server Action `updatePlatformSettings` para atualizar nome do lab, instituição, cores primária/secundária e e-mail de suporte.
+- [x] Suporte completo a alteração de **Logotipo do Laboratório** (exibido na sidebar e login) e **Favicon** da aba do navegador.
+- [x] Configuração da **Cor das Fontes em ambos os modos (Modo Claro e Modo Escuro)** com injeção dinâmica de CSS variables (`--foreground`).
+- [x] Painel interativo de **Exemplos de Estilização em Tempo Real (Showcase White-label)** com alternador de temas Claro/Escuro, simulação de aba do navegador, tipografia e componentes UI.
 - [x] Otimização e calibração de contraste no tema escuro (Dark Mode WCAG AAA para `--primary`, `--secondary`, botões e textos).
 - [ ] Exportação de relatórios de horas por bolsista e por projeto em CSV/PDF para prestação de contas FAPESP/CNPq.
 

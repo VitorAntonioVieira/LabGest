@@ -27,11 +27,16 @@ export default async function RootLayout({
   const secondaryHsl = hexToHsl(settings.secondaryColor);
   const darkPrimaryHsl = hexToDarkHsl(settings.primaryColor);
   const darkSecondaryHsl = hexToDarkHsl(settings.secondaryColor);
+  const fontLightHsl = hexToHsl(settings.fontColorLight || "#111827");
+  const fontDarkHsl = hexToHsl(settings.fontColorDark || "#F8FAFC");
 
   return (
     <html lang="pt-BR" suppressHydrationWarning>
       <head>
-        {/* Injeção Dinâmica de Variáveis CSS White-label com Suporte a Contraste Dark */}
+        {/* Favicon Dinâmico da White-label */}
+        <link rel="icon" href={settings.faviconUrl || "/favicon.ico"} />
+
+        {/* Injeção Dinâmica de Variáveis CSS White-label (Cores da Marca e Fontes) */}
         <style
           id="dynamic-brand-theme"
           dangerouslySetInnerHTML={{
@@ -40,11 +45,17 @@ export default async function RootLayout({
                 --primary: ${primaryHsl};
                 --secondary: ${secondaryHsl};
                 --ring: ${primaryHsl};
+                --foreground: ${fontLightHsl};
+                --card-foreground: ${fontLightHsl};
+                --popover-foreground: ${fontLightHsl};
               }
               .dark {
                 --primary: ${darkPrimaryHsl};
                 --secondary: ${darkSecondaryHsl};
                 --ring: ${darkPrimaryHsl};
+                --foreground: ${fontDarkHsl};
+                --card-foreground: ${fontDarkHsl};
+                --popover-foreground: ${fontDarkHsl};
               }
             `,
           }}

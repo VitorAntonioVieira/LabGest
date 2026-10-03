@@ -528,6 +528,10 @@ export interface PlatformSettingsInput {
   primaryColor?: string;
   secondaryColor?: string;
   accentColor?: string;
+  fontColorLight?: string;
+  fontColorDark?: string;
+  logoUrl?: string | null;
+  faviconUrl?: string | null;
   supportEmail?: string;
 }
 
@@ -546,27 +550,43 @@ export async function updatePlatformSettings(data: PlatformSettingsInput) {
   }
 
   try {
+    const existing = await prisma.platformSettings.findFirst();
+    const targetId = existing?.id || "default-settings";
+
+    const updatePayload: any = {
+      labName: data.labName.trim(),
+      institutionName: data.institutionName?.trim(),
+      departmentName: data.departmentName?.trim(),
+      primaryColor: data.primaryColor,
+      secondaryColor: data.secondaryColor,
+      accentColor: data.accentColor,
+      logoUrl: data.logoUrl !== undefined ? data.logoUrl?.trim() || null : undefined,
+      faviconUrl: data.faviconUrl !== undefined ? data.faviconUrl?.trim() || null : undefined,
+      supportEmail: data.supportEmail?.trim(),
+    };
+
+    if (data.fontColorLight !== undefined) updatePayload.fontColorLight = data.fontColorLight;
+    if (data.fontColorDark !== undefined) updatePayload.fontColorDark = data.fontColorDark;
+
+    const createPayload: any = {
+      id: targetId,
+      labName: data.labName.trim(),
+      institutionName: data.institutionName?.trim() || "UNIFESP",
+      departmentName: data.departmentName?.trim() || "Living Lab CTPP",
+      primaryColor: data.primaryColor || "#0E4330",
+      secondaryColor: data.secondaryColor || "#24576C",
+      accentColor: data.accentColor || "#1F8A64",
+      fontColorLight: data.fontColorLight || "#111827",
+      fontColorDark: data.fontColorDark || "#F8FAFC",
+      logoUrl: data.logoUrl?.trim() || null,
+      faviconUrl: data.faviconUrl?.trim() || null,
+      supportEmail: data.supportEmail?.trim() || "labtecpp@unifesp.br",
+    };
+
     const updated = await prisma.platformSettings.upsert({
-      where: { id: "default-settings" },
-      create: {
-        id: "default-settings",
-        labName: data.labName.trim(),
-        institutionName: data.institutionName?.trim() || "UNIFESP",
-        departmentName: data.departmentName?.trim() || "Living Lab CTPP",
-        primaryColor: data.primaryColor || "#0E4330",
-        secondaryColor: data.secondaryColor || "#24576C",
-        accentColor: data.accentColor || "#F49E4C",
-        supportEmail: data.supportEmail?.trim() || "labtecpp@unifesp.br",
-      },
-      update: {
-        labName: data.labName.trim(),
-        institutionName: data.institutionName?.trim(),
-        departmentName: data.departmentName?.trim(),
-        primaryColor: data.primaryColor,
-        secondaryColor: data.secondaryColor,
-        accentColor: data.accentColor,
-        supportEmail: data.supportEmail?.trim(),
-      },
+      where: { id: targetId },
+      create: createPayload,
+      update: updatePayload,
     });
 
     revalidatePath("/");
