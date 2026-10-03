@@ -31,8 +31,6 @@ services:
       dockerfile: Dockerfile
     container_name: labgest_web
     restart: unless-stopped
-    ports:
-      - "3000:3000"
     environment:
       DATABASE_URL: "postgresql://${POSTGRES_USER:-labgest_admin}:${POSTGRES_PASSWORD:-labgest_secure_password}@postgres:5432/${POSTGRES_DB:-labgest_db}?schema=public"
       NEXTAUTH_URL: ${NEXTAUTH_URL:-http://localhost:3000}
@@ -46,10 +44,30 @@ services:
         condition: service_healthy
     networks:
       - labgest-network
+    expose:
+      - "3000"
+
+  caddy:
+    image: caddy:2-alpine
+    container_name: labgest_caddy
+    restart: always
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      - web
+    networks:
+      - labgest-network
 
 volumes:
   postgres_data:
     driver: local
+  caddy_data:
+  caddy_config:
 
 networks:
   labgest-network:
