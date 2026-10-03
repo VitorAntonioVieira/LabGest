@@ -382,16 +382,16 @@ export function TaskDetailDialog({
             {/* Conteúdo com Scroll */}
             <div className="flex-1 overflow-y-auto space-y-4 pr-1 text-xs">
               {/* Bloco de Ação: Apontamento de Horas Integrado na Mesma Caixa */}
-              <div className="rounded-xl border border-primary/20 bg-primary/5 p-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-2xs">
+              <div className="rounded-xl border border-primary/20 dark:border-primary/40 bg-primary/5 dark:bg-primary/10 p-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-2xs">
                 <div className="space-y-0.5">
-                  <div className="flex items-center gap-1.5 font-bold text-primary text-xs">
-                    <Clock className="h-4 w-4" />
+                  <div className="flex items-center gap-1.5 font-bold text-primary dark:text-emerald-400 text-xs">
+                    <Clock className="h-4 w-4 text-primary dark:text-emerald-400 shrink-0" />
                     <span>Horas Registradas Nesta Atividade:</span>
                     <span className="font-extrabold text-foreground ml-1">
                       {formatMinutesToHours(totalMinutes)}
                     </span>
                   </div>
-                  <p className="text-[11px] text-muted-foreground">
+                  <p className="text-[11px] text-muted-foreground dark:text-zinc-300">
                     Lance o tempo dedicado a esta pesquisa para a validação da sua carga horária.
                   </p>
                 </div>
@@ -414,8 +414,8 @@ export function TaskDetailDialog({
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                 {/* 1. Mover de Bucket / Coluna */}
                 <div className="space-y-1 rounded-lg border border-border/70 p-2.5 bg-card">
-                  <label className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider flex items-center gap-1">
-                    <ColumnsIcon className="h-3 w-3 text-primary" /> Coluna / Bucket
+                  <label className="text-[10px] font-semibold text-muted-foreground dark:text-zinc-300 uppercase tracking-wider flex items-center gap-1">
+                    <ColumnsIcon className="h-3 w-3 text-primary dark:text-emerald-400" /> Coluna / Bucket
                   </label>
                   <select
                     value={columnId}
@@ -432,8 +432,8 @@ export function TaskDetailDialog({
 
                 {/* 2. Prioridade */}
                 <div className="space-y-1 rounded-lg border border-border/70 p-2.5 bg-card">
-                  <label className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider flex items-center gap-1">
-                    <Flag className="h-3 w-3 text-primary" /> Prioridade
+                  <label className="text-[10px] font-semibold text-muted-foreground dark:text-zinc-300 uppercase tracking-wider flex items-center gap-1">
+                    <Flag className="h-3 w-3 text-primary dark:text-emerald-400" /> Prioridade
                   </label>
                   <select
                     value={priority}
@@ -449,8 +449,8 @@ export function TaskDetailDialog({
 
                 {/* 3. Prazo de Conclusão */}
                 <div className="space-y-1 rounded-lg border border-border/70 p-2.5 bg-card">
-                  <label className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider flex items-center gap-1">
-                    <Calendar className="h-3 w-3 text-primary" /> Prazo de Conclusão
+                  <label className="text-[10px] font-semibold text-muted-foreground dark:text-zinc-300 uppercase tracking-wider flex items-center gap-1">
+                    <Calendar className="h-3 w-3 text-primary dark:text-emerald-400" /> Prazo de Conclusão
                   </label>
                   <input
                     type="date"
@@ -464,10 +464,10 @@ export function TaskDetailDialog({
               {/* 4. Pesquisadores Atribuídos (Seleção Interativa com Badges) */}
               <div className="rounded-lg border border-border/70 p-3 space-y-2 bg-card">
                 <div className="flex items-center justify-between">
-                  <label className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider flex items-center gap-1">
-                    <User className="h-3 w-3 text-primary" /> Pesquisadores Atribuídos
+                  <label className="text-[10px] font-semibold text-muted-foreground dark:text-zinc-300 uppercase tracking-wider flex items-center gap-1">
+                    <User className="h-3 w-3 text-primary dark:text-emerald-400" /> Pesquisadores Atribuídos
                   </label>
-                  <span className="text-[10px] text-muted-foreground">
+                  <span className="text-[10px] text-muted-foreground dark:text-zinc-400">
                     Clique no pesquisador para atribuir ou desatribuir
                   </span>
                 </div>
@@ -492,8 +492,8 @@ export function TaskDetailDialog({
                           className={cn(
                             "flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium border transition-all cursor-pointer",
                             isAssigned
-                              ? "bg-primary/10 border-primary text-primary shadow-2xs"
-                              : "bg-muted/40 border-border text-muted-foreground hover:bg-muted hover:text-foreground"
+                              ? "bg-primary/10 dark:bg-emerald-950/60 border-primary dark:border-emerald-600 text-primary dark:text-emerald-300 shadow-2xs font-semibold"
+                              : "bg-muted/40 border-border text-muted-foreground dark:text-zinc-300 hover:bg-muted hover:text-foreground"
                           )}
                         >
                           <Avatar className="h-4 w-4">
@@ -503,7 +503,7 @@ export function TaskDetailDialog({
                             </AvatarFallback>
                           </Avatar>
                           <span>{m.name || m.email || "Pesquisador"}</span>
-                          {isAssigned && <span className="text-[10px] font-bold ml-0.5">✓</span>}
+                          {isAssigned && <span className="text-[10px] font-bold ml-0.5 text-primary dark:text-emerald-400">✓</span>}
                         </button>
                       );
                     })}
@@ -513,8 +513,8 @@ export function TaskDetailDialog({
 
               {/* 5. Descrição & Metodologia (Editável) */}
               <div className="space-y-1.5">
-                <label className="text-[11px] font-bold text-foreground uppercase tracking-wide flex items-center gap-1.5">
-                  <FileText className="h-3.5 w-3.5 text-primary" />
+                <label className="text-[11px] font-bold text-foreground dark:text-zinc-100 uppercase tracking-wide flex items-center gap-1.5">
+                  <FileText className="h-3.5 w-3.5 text-primary dark:text-emerald-400" />
                   Descrição & Metodologia
                 </label>
                 <textarea
@@ -522,7 +522,7 @@ export function TaskDetailDialog({
                   value={description}
                   onChange={(e) => setDescription(e.target.value)}
                   placeholder="Informações técnicas, procedimentos, reagentes, links e referências para a execução desta atividade..."
-                  className="w-full rounded-lg border border-input bg-background p-3 text-xs leading-relaxed text-foreground focus:border-primary focus:ring-1 focus:ring-primary resize-none"
+                  className="w-full rounded-lg border border-input bg-background p-3 text-xs leading-relaxed text-foreground placeholder:text-muted-foreground focus:border-primary focus:ring-1 focus:ring-primary resize-none"
                 />
               </div>
 

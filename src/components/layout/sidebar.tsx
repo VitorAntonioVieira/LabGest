@@ -39,6 +39,12 @@ interface SidebarProps {
   }[];
   activeWorkspacesCount?: number;
   pendingApprovalsCount?: number;
+  brandSettings?: {
+    labName: string;
+    institutionName: string;
+    departmentName: string;
+    logoUrl?: string | null;
+  };
 }
 
 export function Sidebar({
@@ -46,6 +52,7 @@ export function Sidebar({
   workspaces = [],
   activeWorkspacesCount = 0,
   pendingApprovalsCount = 0,
+  brandSettings,
 }: SidebarProps) {
   const pathname = usePathname();
   const { data: session } = useSession();
@@ -108,35 +115,44 @@ export function Sidebar({
     <aside className="h-full w-64 shrink-0 flex flex-col border-r border-border bg-card/95 backdrop-blur z-30 transition-all duration-300">
       {/* 1. Header do Logo Lab CTPP */}
       <div className="flex h-16 items-center justify-between border-b border-border px-5">
-        <Link href="/" className="flex items-center gap-2.5 group">
-          {/* Símbolo Gráfico inspirado no Logo (Livro Foliar + Redes) */}
-          <div className="relative flex h-9 w-9 items-center justify-center rounded-lg bg-primary text-white shadow-sm transition-transform group-hover:scale-105">
-            <svg
-              className="h-5 w-5"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            >
-              {/* Folhas e livro combinados */}
-              <path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H20v20H6.5a2.5 2.5 0 0 1-2.5-2.5Z" />
-              <path d="M6 6h10" />
-              <path d="M6 10h10" />
-              <circle cx="18" cy="4" r="1.5" className="fill-secondary stroke-none" />
-              <circle cx="21" cy="7" r="1.2" className="fill-secondary stroke-none" />
-              <path d="M16 5l2-1 3 3" />
-            </svg>
-          </div>
-
-          <div className="flex flex-col">
-            <div className="flex items-center font-bold tracking-tight text-lg leading-none">
-              <span className="text-primary font-black tracking-normal">Lab</span>
-              <span className="text-secondary ml-1 font-extrabold">CTPP</span>
+        <Link href="/" className="flex items-center gap-2.5 group overflow-hidden">
+          {/* Logotipo Customizado ou Símbolo Padrão */}
+          {brandSettings?.logoUrl ? (
+            <div className="relative flex h-9 w-9 items-center justify-center rounded-lg border border-border/60 bg-muted/20 p-1 shadow-xs transition-transform group-hover:scale-105 shrink-0 overflow-hidden">
+              <img
+                src={brandSettings.logoUrl}
+                alt={brandSettings.labName}
+                className="h-full w-full object-contain"
+              />
             </div>
-            <span className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider mt-0.5">
-              Living Lab • UNIFESP
+          ) : (
+            <div className="relative flex h-9 w-9 items-center justify-center rounded-lg bg-primary text-white shadow-xs transition-transform group-hover:scale-105 shrink-0">
+              <svg
+                className="h-5 w-5"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
+                {/* Folhas e livro combinados */}
+                <path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H20v20H6.5a2.5 2.5 0 0 1-2.5-2.5Z" />
+                <path d="M6 6h10" />
+                <path d="M6 10h10" />
+                <circle cx="18" cy="4" r="1.5" className="fill-secondary stroke-none" />
+                <circle cx="21" cy="7" r="1.2" className="fill-secondary stroke-none" />
+                <path d="M16 5l2-1 3 3" />
+              </svg>
+            </div>
+          )}
+
+          <div className="flex flex-col overflow-hidden">
+            <span className="font-bold tracking-tight text-base leading-none text-foreground truncate">
+              {brandSettings?.labName || "Lab CTPP"}
+            </span>
+            <span className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider mt-1 truncate">
+              {brandSettings?.departmentName || "Living Lab"} • {brandSettings?.institutionName || "UNIFESP"}
             </span>
           </div>
         </Link>
@@ -147,10 +163,10 @@ export function Sidebar({
         <Button
           size="sm"
           onClick={() => setIsRequestWsOpen(true)}
-          className="w-full justify-start gap-2 bg-primary/10 text-primary hover:bg-primary/20 border border-primary/20 shadow-none font-medium text-xs cursor-pointer"
+          className="w-full justify-start gap-2 bg-primary/10 hover:bg-primary/20 text-primary dark:text-emerald-400 dark:bg-emerald-950/40 dark:border-emerald-700/50 dark:hover:bg-emerald-900/50 border border-primary/25 shadow-xs font-semibold text-xs cursor-pointer transition-colors"
         >
-          <PlusCircle className="h-4 w-4" />
-          <span>Solicitar Workspace</span>
+          <PlusCircle className="h-4 w-4 text-primary dark:text-emerald-400 shrink-0" />
+          <span className="text-foreground dark:text-emerald-200 font-semibold">Solicitar Workspace</span>
         </Button>
       </div>
 
@@ -205,9 +221,9 @@ export function Sidebar({
         {/* 4. Módulo Restrito ao Professor (RBAC Dinâmico) */}
         {user.role === "PROFESSOR" && (
           <div className="space-y-1 border-t border-border pt-4">
-            <p className="px-3 text-[11px] font-semibold text-primary uppercase tracking-wider flex items-center justify-between">
+            <p className="px-3 text-[11px] font-semibold text-primary dark:text-emerald-400 uppercase tracking-wider flex items-center justify-between">
               <span>Coordenação Geral</span>
-              <ShieldCheck className="h-3.5 w-3.5 text-primary" />
+              <ShieldCheck className="h-3.5 w-3.5 text-primary dark:text-emerald-400" />
             </p>
             {adminItems.map((item) => {
               const isActive = pathname === item.href;
@@ -223,7 +239,7 @@ export function Sidebar({
                   )}
                 >
                   <div className="flex items-center gap-3">
-                    <item.icon className="h-4 w-4 text-secondary shrink-0" />
+                    <item.icon className="h-4 w-4 text-secondary dark:text-cyan-400 shrink-0" />
                     <span className="truncate">{item.title}</span>
                   </div>
                   {item.badge && (
@@ -248,7 +264,7 @@ export function Sidebar({
             </p>
             <Link
               href="/workspaces"
-              className="text-[11px] text-primary hover:underline font-medium"
+              className="text-[11px] text-primary dark:text-emerald-400 hover:underline font-semibold"
             >
               Ver todos
             </Link>

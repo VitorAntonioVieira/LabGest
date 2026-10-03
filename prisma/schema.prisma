@@ -378,8 +378,10 @@ model PlatformSettings {
   primaryColor    String   @default("#0E4330")     // Hex da cor primária ("Lab" verde floresta)
   secondaryColor  String   @default("#24576C")     // Hex da cor secundária ("CTPP" petróleo)
   accentColor     String   @default("#1F8A64")     // Hex de destaque
+  fontColorLight  String?  @default("#111827")     // Hex da cor das fontes em modo claro
+  fontColorDark   String?  @default("#F8FAFC")     // Hex da cor das fontes em modo escuro
   logoUrl         String?                          // URL ou caminho do logotipo
-  faviconUrl      String?
+  faviconUrl      String?                          // URL ou caminho do favicon
   supportEmail    String?  @default("contato@labctpp.unifesp.br")
   updatedAt       DateTime @updatedAt
 }

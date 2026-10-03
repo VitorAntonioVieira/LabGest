@@ -2,6 +2,7 @@ import React from "react";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { getPlatformSettings } from "@/lib/settings";
 import { Sidebar } from "@/components/layout/sidebar";
 import { Header } from "@/components/layout/header";
 
@@ -12,8 +13,8 @@ export default async function DashboardLayout({
 }) {
   const session = await getServerSession(authOptions);
 
-  // Busca dinâmica dos braços ativos e contadores reais no banco de dados
-  const [activeWorkspaces, activeCount, pendingCount] = await Promise.all([
+  // Busca dinâmica dos braços ativos, contadores reais e configurações de marca
+  const [activeWorkspaces, activeCount, pendingCount, platformSettings] = await Promise.all([
     prisma.workspace.findMany({
       where: { status: "APPROVED" },
       select: { id: true, name: true, slug: true },
@@ -26,11 +27,12 @@ export default async function DashboardLayout({
     prisma.workspace.count({
       where: { status: "PENDING" },
     }),
+    getPlatformSettings(),
   ]);
 
   return (
     <div className="flex h-screen w-full overflow-hidden bg-background">
-      {/* Sidebar 100% Dinâmica com Dados Reais da Sessão e do Banco */}
+      {/* Sidebar 100% Dinâmica com Dados Reais da Sessão, Banco e White-label */}
       <Sidebar
         currentUser={
           session?.user
@@ -45,6 +47,12 @@ export default async function DashboardLayout({
         workspaces={activeWorkspaces}
         activeWorkspacesCount={activeCount}
         pendingApprovalsCount={pendingCount}
+        brandSettings={{
+          labName: platformSettings.labName,
+          institutionName: platformSettings.institutionName,
+          departmentName: platformSettings.departmentName,
+          logoUrl: platformSettings.logoUrl,
+        }}
       />
 
       {/* Conteúdo Principal com Barra Superior e Scroll Independente */}

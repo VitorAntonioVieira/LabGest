@@ -108,12 +108,26 @@ stateDiagram-v2
   - [x] Alternância suave entre os modos `"details"` e `"log-time"` na mesma caixa (sem abrir modal sobre modal).
   - [x] Histórico de apontamentos da tarefa visível com data e resumo.
 
-### Fase 5: Configurações White-label e Expansão
+### Fase 5: Cadernos e Documentação Colaborativa dos Workspaces (Docs/Notion-like)
+- [x] Listagem dos cadernos por workspace com autor e data de atualização (`/workspace/[id]/docs`).
+- [x] Modal de criação de novos cadernos/páginas (`CreateDocumentDialog`).
+- [ ] **Edição Funcional dos Cadernos do Workspace:**
+  - [ ] Implementar rota dinâmica do editor `/workspace/[id]/docs/[docId]`.
+  - [ ] Editor interativo (Markdown / Block Editor rico) com suporte a formatação, cabeçalhos, listas de checagem e blocos de código.
+  - [ ] Server Action `updateWorkspaceDocument({ docId, title, content, icon })` para persistência no banco de dados.
+  - [ ] Sistema de autosave ou botão explícito "Salvar Alterações" com indicação visual de status de salvamento.
+  - [ ] Exibição e atualização do autor da última alteração (`updatedBy`) e timestamp real.
+  - [ ] Ação para exclusão e renomeação de cadernos diretamente na visualização do documento.
+
+### Fase 6: Configurações White-label e Expansão
 - [x] Modelo `PlatformSettings` no banco de dados para personalização.
 - [x] Página de configurações institucionais (`/admin/settings`).
 - [x] Server Action `updatePlatformSettings` para atualizar nome do lab, instituição, cores primária/secundária e e-mail de suporte.
+- [x] Suporte completo a alteração de **Logotipo do Laboratório** (exibido na sidebar e login) e **Favicon** da aba do navegador.
+- [x] Configuração da **Cor das Fontes em ambos os modos (Modo Claro e Modo Escuro)** com injeção dinâmica de CSS variables (`--foreground`).
+- [x] Painel interativo de **Exemplos de Estilização em Tempo Real (Showcase White-label)** com alternador de temas Claro/Escuro, simulação de aba do navegador, tipografia e componentes UI.
+- [x] Otimização e calibração de contraste no tema escuro (Dark Mode WCAG AAA para `--primary`, `--secondary`, botões e textos).
 - [ ] Exportação de relatórios de horas por bolsista e por projeto em CSV/PDF para prestação de contas FAPESP/CNPq.
-- [ ] Módulo de Caderno de Laboratório enriquecido com suporte a Markdown/Editor rico e anexos de arquivos.
 
 ---
 
