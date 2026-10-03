@@ -147,10 +147,10 @@ export function Sidebar({
         <Button
           size="sm"
           onClick={() => setIsRequestWsOpen(true)}
-          className="w-full justify-start gap-2 bg-primary/10 text-primary hover:bg-primary/20 border border-primary/20 shadow-none font-medium text-xs cursor-pointer"
+          className="w-full justify-start gap-2 bg-primary/10 hover:bg-primary/20 text-primary dark:text-emerald-400 dark:bg-emerald-950/40 dark:border-emerald-700/50 dark:hover:bg-emerald-900/50 border border-primary/25 shadow-xs font-semibold text-xs cursor-pointer transition-colors"
         >
-          <PlusCircle className="h-4 w-4" />
-          <span>Solicitar Workspace</span>
+          <PlusCircle className="h-4 w-4 text-primary dark:text-emerald-400 shrink-0" />
+          <span className="text-foreground dark:text-emerald-200 font-semibold">Solicitar Workspace</span>
         </Button>
       </div>
 
@@ -205,9 +205,9 @@ export function Sidebar({
         {/* 4. Módulo Restrito ao Professor (RBAC Dinâmico) */}
         {user.role === "PROFESSOR" && (
           <div className="space-y-1 border-t border-border pt-4">
-            <p className="px-3 text-[11px] font-semibold text-primary uppercase tracking-wider flex items-center justify-between">
+            <p className="px-3 text-[11px] font-semibold text-primary dark:text-emerald-400 uppercase tracking-wider flex items-center justify-between">
               <span>Coordenação Geral</span>
-              <ShieldCheck className="h-3.5 w-3.5 text-primary" />
+              <ShieldCheck className="h-3.5 w-3.5 text-primary dark:text-emerald-400" />
             </p>
             {adminItems.map((item) => {
               const isActive = pathname === item.href;
@@ -223,7 +223,7 @@ export function Sidebar({
                   )}
                 >
                   <div className="flex items-center gap-3">
-                    <item.icon className="h-4 w-4 text-secondary shrink-0" />
+                    <item.icon className="h-4 w-4 text-secondary dark:text-cyan-400 shrink-0" />
                     <span className="truncate">{item.title}</span>
                   </div>
                   {item.badge && (
@@ -248,7 +248,7 @@ export function Sidebar({
             </p>
             <Link
               href="/workspaces"
-              className="text-[11px] text-primary hover:underline font-medium"
+              className="text-[11px] text-primary dark:text-emerald-400 hover:underline font-semibold"
             >
               Ver todos
             </Link>

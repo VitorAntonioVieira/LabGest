@@ -52,26 +52,26 @@
     --popover: 165 20% 9%;
     --popover-foreground: 160 15% 96%;
 
-    /* Verde Esmeralda Vibrante para Contraste Dark */
-    --primary: 160 60% 45%;
-    --primary-foreground: 165 24% 6%;
+    /* Verde Esmeralda Vibrante para Contraste Dark (WCAG AAA) */
+    --primary: 160 65% 52%;
+    --primary-foreground: 165 30% 6%;
 
     /* Ciano Petróleo Vibrante */
-    --secondary: 194 55% 52%;
-    --secondary-foreground: 165 24% 6%;
+    --secondary: 194 65% 56%;
+    --secondary-foreground: 165 30% 6%;
 
     --muted: 165 16% 14%;
-    --muted-foreground: 165 12% 65%;
+    --muted-foreground: 165 12% 72%;
 
-    --accent: 165 20% 14%;
-    --accent-foreground: 160 60% 55%;
+    --accent: 165 20% 16%;
+    --accent-foreground: 160 65% 65%;
 
-    --destructive: 0 62.8% 45%;
+    --destructive: 0 72% 55%;
     --destructive-foreground: 0 0% 98%;
 
-    --border: 165 14% 17%;
-    --input: 165 14% 17%;
-    --ring: 160 60% 45%;
+    --border: 165 14% 22%;
+    --input: 165 14% 22%;
+    --ring: 160 65% 52%;
   }
 }
 

@@ -4,7 +4,7 @@ import "./globals.css";
 
 import { AuthProvider } from "@/components/providers/session-provider";
 import { getPlatformSettings } from "@/lib/settings";
-import { hexToHsl } from "@/lib/colors";
+import { hexToHsl, hexToDarkHsl } from "@/lib/colors";
 
 const inter = Inter({ subsets: ["latin"], variable: "--font-sans" });
 
@@ -25,11 +25,13 @@ export default async function RootLayout({
   const settings = await getPlatformSettings();
   const primaryHsl = hexToHsl(settings.primaryColor);
   const secondaryHsl = hexToHsl(settings.secondaryColor);
+  const darkPrimaryHsl = hexToDarkHsl(settings.primaryColor);
+  const darkSecondaryHsl = hexToDarkHsl(settings.secondaryColor);
 
   return (
     <html lang="pt-BR" suppressHydrationWarning>
       <head>
-        {/* Injeção Dinâmica de Variáveis CSS White-label */}
+        {/* Injeção Dinâmica de Variáveis CSS White-label com Suporte a Contraste Dark */}
         <style
           id="dynamic-brand-theme"
           dangerouslySetInnerHTML={{
@@ -38,6 +40,11 @@ export default async function RootLayout({
                 --primary: ${primaryHsl};
                 --secondary: ${secondaryHsl};
                 --ring: ${primaryHsl};
+              }
+              .dark {
+                --primary: ${darkPrimaryHsl};
+                --secondary: ${darkSecondaryHsl};
+                --ring: ${darkPrimaryHsl};
               }
             `,
           }}
