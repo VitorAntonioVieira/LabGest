@@ -111,13 +111,19 @@ stateDiagram-v2
 ### Fase 5: Cadernos e Documentação Colaborativa dos Workspaces (Docs/Notion-like)
 - [x] Listagem dos cadernos por workspace com autor e data de atualização (`/workspace/[id]/docs`).
 - [x] Modal de criação de novos cadernos/páginas (`CreateDocumentDialog`).
-- [ ] **Edição Funcional dos Cadernos do Workspace:**
-  - [ ] Implementar rota dinâmica do editor `/workspace/[id]/docs/[docId]`.
-  - [ ] Editor interativo (Markdown / Block Editor rico) com suporte a formatação, cabeçalhos, listas de checagem e blocos de código.
-  - [ ] Server Action `updateWorkspaceDocument({ docId, title, content, icon })` para persistência no banco de dados.
-  - [ ] Sistema de autosave ou botão explícito "Salvar Alterações" com indicação visual de status de salvamento.
-  - [ ] Exibição e atualização do autor da última alteração (`updatedBy`) e timestamp real.
-  - [ ] Ação para exclusão e renomeação de cadernos diretamente na visualização do documento.
+- [x] **Edição Funcional dos Cadernos do Workspace (Notion & OneNote inspired):**
+  - [x] Rota dinâmica do editor `/workspace/[id]/docs/[docId]` e rota `/docs/[docId]`.
+  - [x] Editor interativo em blocos (BlockNote / Notion-like) com cabeçalhos, checklists, tabelas e comandos slash (`/`).
+  - [x] Banner de Capa personalizável (Notion Cover) com presets científicos e URLs customizadas.
+  - [x] Seletor interativo de Ícone / Emoji com paleta curada de pesquisa e biotecnologia.
+  - [x] Painel lateral retrátil de navegação de páginas inspirado no Microsoft OneNote com busca instantânea.
+  - [x] Título editável inline sem bordas e com sincronização automática.
+  - [x] Server Action `updateWorkspaceDocument({ docId, title, content, icon, coverImage })` para persistência no PostgreSQL.
+  - [x] Sistema de autosave debounced com status visual (`Salvando...`, `Salvo`) e botão explícito "Salvar" (`Ctrl+S`).
+  - [x] Exibição de autor e timestamp real da última alteração (`updatedAt`).
+  - [x] Exclusão e confirmação de cadernos diretamente no editor com `deleteWorkspaceDocument`.
+  - [x] Abertura direta do editor a partir dos cards de cadernos nos workspaces e na listagem central.
+
 
 ### Fase 6: Configurações White-label e Expansão
 - [x] Modelo `PlatformSettings` no banco de dados para personalização.

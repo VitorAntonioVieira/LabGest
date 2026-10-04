@@ -69,32 +69,43 @@ export default async function DocsCentralPage() {
         </Card>
       ) : (
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {documents.map((doc) => (
-            <Card
-              key={doc.id}
-              className="p-4 hover:border-secondary/60 transition-all cursor-pointer shadow-2xs hover:shadow-xs group flex flex-col justify-between"
-            >
-              <div>
-                <div className="flex items-start justify-between">
-                  <span className="text-2xl">{doc.icon || "📄"}</span>
-                  <Badge variant={doc.type === "WORKSPACE" ? "default" : "outline"} className="text-[10px]">
-                    {doc.type === "WORKSPACE" ? doc.workspace?.name || "Workspace" : "Pessoal"}
-                  </Badge>
-                </div>
-                <CardTitle className="text-sm font-semibold mt-3 group-hover:text-secondary transition-colors line-clamp-1">
-                  {doc.title}
-                </CardTitle>
-                <p className="text-[11px] text-muted-foreground mt-1 line-clamp-2">
-                  Documentação e notas de pesquisa sincronizadas na plataforma.
-                </p>
-              </div>
+          {documents.map((doc) => {
+            const href = doc.workspaceId
+              ? `/workspace/${doc.workspaceId}/docs/${doc.id}`
+              : `/docs/${doc.id}`;
 
-              <div className="pt-3 mt-3 border-t border-border/60 flex items-center justify-between text-[10px] text-muted-foreground">
-                <span>Por {doc.owner?.name || "Pesquisador"}</span>
-                <span>{new Date(doc.updatedAt).toLocaleDateString("pt-BR")}</span>
-              </div>
-            </Card>
-          ))}
+            return (
+              <Link key={doc.id} href={href} className="block group">
+                <Card className="p-4 h-full hover:border-secondary/60 transition-all cursor-pointer shadow-2xs hover:shadow-xs flex flex-col justify-between">
+                  <div>
+                    <div className="flex items-start justify-between">
+                      <span className="text-2xl">{doc.icon || "📄"}</span>
+                      <div className="flex items-center gap-1.5">
+                        <Badge
+                          variant={doc.type === "WORKSPACE" ? "default" : "outline"}
+                          className="text-[10px]"
+                        >
+                          {doc.type === "WORKSPACE" ? doc.workspace?.name || "Workspace" : "Pessoal"}
+                        </Badge>
+                        <ChevronRight className="h-3.5 w-3.5 text-muted-foreground opacity-40 group-hover:opacity-100 transition-opacity" />
+                      </div>
+                    </div>
+                    <CardTitle className="text-sm font-semibold mt-3 group-hover:text-secondary transition-colors line-clamp-1">
+                      {doc.title}
+                    </CardTitle>
+                    <p className="text-[11px] text-muted-foreground mt-1 line-clamp-2">
+                      Documentação e notas de pesquisa sincronizadas na plataforma.
+                    </p>
+                  </div>
+
+                  <div className="pt-3 mt-3 border-t border-border/60 flex items-center justify-between text-[10px] text-muted-foreground">
+                    <span>Por {doc.owner?.name || "Pesquisador"}</span>
+                    <span>{new Date(doc.updatedAt).toLocaleDateString("pt-BR")}</span>
+                  </div>
+                </Card>
+              </Link>
+            );
+          })}
         </div>
       )}
     </div>

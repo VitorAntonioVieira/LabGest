@@ -84,29 +84,33 @@ export default async function WorkspaceDocsPage({ params }: DocsPageProps) {
           <p className="text-xs text-muted-foreground mt-1 max-w-sm mx-auto">
             Comece a documentar protocolos, metodologias experimentais e registros da equipe de pesquisa.
           </p>
-          <Button size="sm" className="mt-4 text-xs bg-secondary text-secondary-foreground">
-            <Plus className="mr-1 h-3.5 w-3.5" />
-            Criar Primeira Página
-          </Button>
+          <div className="mt-4 flex justify-center">
+            <DocsHeaderActions workspaceId={workspace.id} label="Criar Primeira Página" />
+          </div>
         </Card>
       ) : (
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
           {workspace.documents.map((doc) => (
-            <Card
+            <Link
               key={doc.id}
-              className="p-4 hover:border-secondary/60 transition-all cursor-pointer shadow-2xs hover:shadow-xs group"
+              href={`/workspace/${workspace.id}/docs/${doc.id}`}
+              className="block group"
             >
-              <div className="flex items-start justify-between">
-                <span className="text-2xl">{doc.icon || "📄"}</span>
-                <ChevronRight className="h-4 w-4 text-muted-foreground opacity-40 group-hover:opacity-100 transition-opacity" />
-              </div>
-              <CardTitle className="text-sm font-semibold mt-2 group-hover:text-secondary transition-colors">
-                {doc.title}
-              </CardTitle>
-              <p className="text-[11px] text-muted-foreground mt-2">
-                Atualizado em {doc.updatedAt.toLocaleDateString("pt-BR")} por {doc.owner?.name || "Pesquisador"}
-              </p>
-            </Card>
+              <Card className="p-4 h-full hover:border-secondary/60 transition-all cursor-pointer shadow-2xs hover:shadow-xs flex flex-col justify-between">
+                <div>
+                  <div className="flex items-start justify-between">
+                    <span className="text-2xl">{doc.icon || "📄"}</span>
+                    <ChevronRight className="h-4 w-4 text-muted-foreground opacity-40 group-hover:opacity-100 transition-opacity" />
+                  </div>
+                  <CardTitle className="text-sm font-semibold mt-2 group-hover:text-secondary transition-colors line-clamp-1">
+                    {doc.title}
+                  </CardTitle>
+                </div>
+                <p className="text-[11px] text-muted-foreground mt-3 pt-2 border-t border-border/60">
+                  Atualizado em {doc.updatedAt.toLocaleDateString("pt-BR")} por {doc.owner?.name || "Pesquisador"}
+                </p>
+              </Card>
+            </Link>
           ))}
         </div>
       )}

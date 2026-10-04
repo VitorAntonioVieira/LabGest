@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useTransition } from "react";
+import { useRouter } from "next/navigation";
 import { createPortal } from "react-dom";
 import { BookOpen, X, Loader2, Plus, FileText } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -25,6 +26,7 @@ export function CreateDocumentDialog({
   workspaceId,
   workspaces = [],
 }: CreateDocumentDialogProps) {
+  const router = useRouter();
   const [mounted, setMounted] = useState(false);
   const [isPending, startTransition] = useTransition();
   const [title, setTitle] = useState("");
@@ -61,7 +63,7 @@ export function CreateDocumentDialog({
 
     startTransition(async () => {
       try {
-        await createDocument({
+        const res = await createDocument({
           title: title.trim(),
           icon: icon || "📄",
           workspaceId: selectedWsId || undefined,
@@ -69,6 +71,13 @@ export function CreateDocumentDialog({
         });
         setTitle("");
         onClose();
+        if (res?.document?.id) {
+          if (res.document.workspaceId) {
+            router.push(`/workspace/${res.document.workspaceId}/docs/${res.document.id}`);
+          } else {
+            router.push(`/docs/${res.document.id}`);
+          }
+        }
       } catch (err: any) {
         setErrorMsg(err.message || "Erro ao criar documento.");
       }

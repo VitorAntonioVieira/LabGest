@@ -755,3 +755,92 @@ export async function deleteTask(taskId: string, workspaceId: string) {
     throw new Error("Erro ao excluir atividade.");
   }
 }
+
+export interface UpdateWorkspaceDocumentInput {
+  docId: string;
+  title?: string;
+  content?: any;
+  icon?: string | null;
+  coverImage?: string | null;
+  isPublished?: boolean;
+}
+
+/**
+ * Server Action: Atualizar Conteúdo, Título ou Metadados do Caderno de Documentação (Notion-like)
+ */
+export async function updateWorkspaceDocument(data: UpdateWorkspaceDocumentInput) {
+  const session = await getServerSession(authOptions);
+  if (!session?.user?.id) {
+    throw new Error("Não autenticado.");
+  }
+
+  const existingDoc = await prisma.document.findUnique({
+    where: { id: data.docId },
+  });
+
+  if (!existingDoc) {
+    throw new Error("Documento não encontrado.");
+  }
+
+  try {
+    const updated = await prisma.document.update({
+      where: { id: data.docId },
+      data: {
+        ...(data.title !== undefined && { title: data.title.trim() || "Sem título" }),
+        ...(data.content !== undefined && { content: data.content }),
+        ...(data.icon !== undefined && { icon: data.icon }),
+        ...(data.coverImage !== undefined && { coverImage: data.coverImage }),
+        ...(data.isPublished !== undefined && { isPublished: data.isPublished }),
+      },
+      include: {
+        owner: { select: { id: true, name: true, image: true, email: true } },
+        workspace: { select: { id: true, name: true, slug: true } },
+      },
+    });
+
+    revalidatePath("/docs");
+    if (updated.workspaceId) {
+      revalidatePath(`/workspace/${updated.workspaceId}/docs`);
+      revalidatePath(`/workspace/${updated.workspaceId}/docs/${updated.id}`);
+    }
+
+    return {
+      success: true,
+      document: {
+        ...updated,
+        updatedAt: updated.updatedAt.toISOString(),
+        createdAt: updated.createdAt.toISOString(),
+      },
+    };
+  } catch (error) {
+    console.error("[updateWorkspaceDocument Error]:", error);
+    throw new Error("Erro ao salvar alterações no documento.");
+  }
+}
+
+/**
+ * Server Action: Excluir Caderno de Documentação
+ */
+export async function deleteWorkspaceDocument(docId: string, workspaceId?: string) {
+  const session = await getServerSession(authOptions);
+  if (!session?.user?.id) {
+    throw new Error("Não autenticado.");
+  }
+
+  try {
+    await prisma.document.delete({
+      where: { id: docId },
+    });
+
+    revalidatePath("/docs");
+    if (workspaceId) {
+      revalidatePath(`/workspace/${workspaceId}/docs`);
+    }
+
+    return { success: true };
+  } catch (error) {
+    console.error("[deleteWorkspaceDocument Error]:", error);
+    throw new Error("Erro ao excluir caderno de documentação.");
+  }
+}
+
