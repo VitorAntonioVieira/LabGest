@@ -11,3 +11,7 @@ Dockerfile
 docker-compose*.yml
 .dockerignore
 README.md
+db_data
+db_data/
+db_dumps/
+*.sql
