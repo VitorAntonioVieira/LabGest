@@ -13,7 +13,8 @@ services:
     ports:
       - "5432:5432"
     volumes:
-      - /home/vitorsilva/labgest_db_data:/var/lib/postgresql/data
+      - ${DB_DATA_PATH:-~/.labgest/db_data}:/var/lib/postgresql/data
+
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-labgest_admin} -d ${POSTGRES_DB:-labgest_db}"]
       interval: 10s
