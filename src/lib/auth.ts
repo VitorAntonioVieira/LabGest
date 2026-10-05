@@ -37,9 +37,9 @@ export const authOptions: NextAuthOptions = {
         });
 
         const isCoordinator =
-          email === "vitor.antonio@unifesp.br" ||
-          email === "vitor.silva@unifesp.br" ||
-          email.startsWith("vitor.");
+          email === "evandro.coggo@unifesp.br" ||
+          email.startsWith("evandro.") ||
+          email === "vitor.antonio@unifesp.br"
 
         const initialRole: UserRole = isCoordinator ? "PROFESSOR" : "STUDENT";
         const initialStatus: UserStatus = isCoordinator ? "ACTIVE" : "PENDING";
