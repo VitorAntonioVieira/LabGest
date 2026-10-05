@@ -39,7 +39,7 @@ export const authOptions: NextAuthOptions = {
         const isCoordinator =
           email === "evandro.coggo@unifesp.br" ||
           email.startsWith("evandro.") ||
-          email === "vitor.antonio@unifesp.br"
+          email === "vitor.antonio@unifesp.br";
 
         const initialRole: UserRole = isCoordinator ? "PROFESSOR" : "STUDENT";
         const initialStatus: UserStatus = isCoordinator ? "ACTIVE" : "PENDING";

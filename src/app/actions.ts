@@ -482,8 +482,24 @@ export interface CreateDocumentInput {
 export async function createDocument(data: CreateDocumentInput) {
   const session = await getServerSession(authOptions);
 
-  if (!session?.user?.id) {
-    throw new Error("Não autenticado.");
+  if (!session?.user?.id && !session?.user?.email) {
+    throw new Error("Não autenticado. Por favor, faça login.");
+  }
+
+  // Busca o usuário atual no banco para garantir que o ID é válido e evitar violação de FK
+  let dbUser = session?.user?.id
+    ? await prisma.user.findUnique({ where: { id: session.user.id }, select: { id: true, name: true } })
+    : null;
+
+  if (!dbUser && session?.user?.email) {
+    dbUser = await prisma.user.findUnique({
+      where: { email: session.user.email },
+      select: { id: true, name: true },
+    });
+  }
+
+  if (!dbUser) {
+    throw new Error("Sessão expirada ou usuário não sincronizado. Por favor, recarregue a página ou faça login novamente.");
   }
 
   if (!data.title || data.title.trim() === "") {
@@ -497,16 +513,19 @@ export async function createDocument(data: CreateDocumentInput) {
         icon: data.icon || "📄",
         type: data.workspaceId ? "WORKSPACE" : (data.type || "PERSONAL"),
         workspaceId: data.workspaceId || null,
-        ownerId: session.user.id,
-        content: {
-          type: "doc",
-          content: [
-            {
-              type: "paragraph",
-              text: `Criado por ${session.user.name || "Pesquisador"} em ${new Date().toLocaleDateString("pt-BR")}.`,
-            },
-          ],
-        },
+        ownerId: dbUser.id,
+        content: [
+          {
+            type: "paragraph",
+            content: [
+              {
+                type: "text",
+                text: `Criado por ${dbUser.name || session.user.name || "Pesquisador"} em ${new Date().toLocaleDateString("pt-BR")}.`,
+                styles: {},
+              },
+            ],
+          },
+        ],
       },
     });
 

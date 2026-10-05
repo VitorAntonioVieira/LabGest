@@ -13,7 +13,7 @@ services:
     ports:
       - "5432:5432"
     volumes:
-      - ./db_data:/var/lib/postgresql/data
+      - postgres_data:/var/lib/postgresql/data
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-labgest_admin} -d ${POSTGRES_DB:-labgest_db}"]
       interval: 10s
@@ -31,6 +31,8 @@ services:
       dockerfile: Dockerfile
     container_name: labgest_web
     restart: unless-stopped
+    ports:
+      - "3000:3000"
     environment:
       DATABASE_URL: "postgresql://${POSTGRES_USER:-labgest_admin}:${POSTGRES_PASSWORD:-labgest_secure_password}@postgres:5432/${POSTGRES_DB:-labgest_db}?schema=public"
       NEXTAUTH_URL: ${NEXTAUTH_URL:-http://localhost:3000}
@@ -64,9 +66,12 @@ services:
       - labgest-network
 
 volumes:
+  postgres_data:
+    driver: local
   caddy_data:
   caddy_config:
 
 networks:
   labgest-network:
     driver: bridge
+
