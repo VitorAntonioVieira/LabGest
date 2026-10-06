@@ -18,6 +18,24 @@ async function main() {
   await prisma.tag.deleteMany({});
   await prisma.workspace.deleteMany({});
 
+  // Remove qualquer usuário de teste ou mock residual da base de dados
+  await prisma.user.deleteMany({
+    where: {
+      OR: [
+        { email: { in: ["mariana.costa@aluno.unifesp.br", "mariana.souza@aluno.unifesp.br"] } },
+        { email: { contains: "mock", mode: "insensitive" } },
+        { email: { contains: "fake", mode: "insensitive" } },
+        { email: { startsWith: "teste@", mode: "insensitive" } },
+        { email: { startsWith: "test@", mode: "insensitive" } },
+      ],
+      NOT: {
+        email: {
+          in: ["evandro.coggo@unifesp.br", "vitor.silva@unifesp.br", "vitor.antonio@unifesp.br"],
+        },
+      },
+    },
+  });
+
   // 2. CONFIGURAÇÕES WHITE-LABEL DA PLATAFORMA (LAB CTPP • UNIFESP)
   await prisma.platformSettings.upsert({
     where: { id: "default-settings" },
@@ -42,7 +60,7 @@ async function main() {
     },
   });
 
-  // 3. PROFESSOR REAL E USUÁRIOS
+  // 3. PROFESSOR REAL E USUÁRIOS REAIS
   // Professor Coordenador Oficial: Evandro Coggo
   const profEvandro = await prisma.user.upsert({
     where: { email: "evandro.coggo@unifesp.br" },
@@ -85,25 +103,6 @@ async function main() {
     },
   });
 
-  // Pesquisadora / Estudante de Iniciação Científica para testes de atribuição
-  const studentMariana = await prisma.user.upsert({
-    where: { email: "mariana.costa@aluno.unifesp.br" },
-    update: {
-      name: "Mariana Costa",
-      role: "STUDENT",
-      status: "ACTIVE",
-    },
-    create: {
-      email: "mariana.costa@aluno.unifesp.br",
-      name: "Mariana Costa",
-      role: "STUDENT",
-      status: "ACTIVE",
-      academicId: "RA-154920",
-      course: "Políticas Públicas & Inovação",
-      bio: "Pesquisadora de Iniciação Científica no Lab CTPP",
-    },
-  });
-
   // =========================================================================
   // WORKSPACE 1: REVISÃO RESPONSABILIDADE SOCIAL UNIVERSITÁRIA (RSU)
   // Estado: Em andamento | Responsável: Evandro | Prazo: 2026
@@ -123,7 +122,6 @@ async function main() {
         create: [
           { userId: profEvandro.id, role: "OWNER" },
           { userId: userVitor.id, role: "LEADER" },
-          { userId: studentMariana.id, role: "MEMBER" },
         ],
       },
       columns: {
@@ -174,7 +172,7 @@ async function main() {
       priority: "MEDIUM",
       completedAt: new Date(),
       assignees: {
-        create: [{ userId: profEvandro.id }, { userId: studentMariana.id }],
+        create: [{ userId: profEvandro.id }, { userId: userVitor.id }],
       },
     },
   });
@@ -208,7 +206,7 @@ async function main() {
       priority: "HIGH",
       dueDate: new Date("2026-10-31"),
       assignees: {
-        create: [{ userId: profEvandro.id }, { userId: userVitor.id }, { userId: studentMariana.id }],
+        create: [{ userId: profEvandro.id }, { userId: userVitor.id }],
       },
     },
   });
@@ -339,7 +337,6 @@ async function main() {
         create: [
           { userId: profEvandro.id, role: "OWNER" },
           { userId: userVitor.id, role: "LEADER" },
-          { userId: studentMariana.id, role: "MEMBER" },
         ],
       },
       columns: {
@@ -406,7 +403,7 @@ async function main() {
       priority: "MEDIUM",
       dueDate: new Date("2026-11-20"),
       assignees: {
-        create: [{ userId: studentMariana.id }, { userId: userVitor.id }],
+        create: [{ userId: profEvandro.id }, { userId: userVitor.id }],
       },
     },
   });
@@ -677,7 +674,7 @@ async function main() {
       description:
         "Estudo sobre a relação entre Ciência Aberta e relevância/impacto social da pesquisa, com atenção especial ao papel da abertura do conhecimento científico e iniciativas como a SciELO na aproximação entre ciência, sociedade e políticas públicas.",
       status: "PENDING",
-      requestedById: studentMariana.id,
+      requestedById: profEvandro.id,
     },
   });
 

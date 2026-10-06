@@ -121,6 +121,23 @@ export function TaskDetailDialog({
   const [timeSummary, setTimeSummary] = useState("");
   const [timeFormError, setTimeFormError] = useState<string | null>(null);
 
+  // Combina todos os pesquisadores disponíveis do sistema com quaisquer pesquisadores já atribuídos nesta tarefa
+  const availableMembers = React.useMemo(() => {
+    const map = new Map<string, WorkspaceMemberInfo>();
+    workspaceMembers.forEach((m) => map.set(m.id, m));
+    task?.assignees?.forEach((a) => {
+      if (a.user && !map.has(a.user.id)) {
+        map.set(a.user.id, {
+          id: a.user.id,
+          name: a.user.name,
+          email: a.user.email || null,
+          image: a.user.image,
+        });
+      }
+    });
+    return Array.from(map.values());
+  }, [workspaceMembers, task]);
+
   useEffect(() => {
     setMounted(true);
   }, []);
@@ -195,7 +212,7 @@ export function TaskDetailDialog({
         });
 
         const chosenCol = columns.find((c) => c.id === columnId);
-        const chosenAssignees = workspaceMembers
+        const chosenAssignees = availableMembers
           .filter((m) => selectedAssigneeIds.includes(m.id))
           .map((m) => ({
             user: {
@@ -472,11 +489,11 @@ export function TaskDetailDialog({
                   </span>
                 </div>
 
-                {workspaceMembers.length === 0 ? (
-                  <p className="text-xs text-muted-foreground italic">Nenhum membro registrado no workspace.</p>
+                {availableMembers.length === 0 ? (
+                  <p className="text-xs text-muted-foreground italic">Nenhum pesquisador cadastrado no sistema.</p>
                 ) : (
                   <div className="flex flex-wrap gap-1.5">
-                    {workspaceMembers.map((m) => {
+                    {availableMembers.map((m) => {
                       const isAssigned = selectedAssigneeIds.includes(m.id);
                       return (
                         <button

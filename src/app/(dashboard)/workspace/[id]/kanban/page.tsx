@@ -36,7 +36,7 @@ export default async function WorkspaceKanbanPage({ params }: KanbanPageProps) {
           tasks: {
             orderBy: { order: "asc" },
             include: {
-              assignees: { include: { user: { select: { id: true, name: true, image: true } } } },
+              assignees: { include: { user: { select: { id: true, name: true, image: true, email: true } } } },
               tags: { include: { tag: true } },
               timeEntries: {
                 select: { id: true, durationMinutes: true, summary: true, date: true },
@@ -48,7 +48,7 @@ export default async function WorkspaceKanbanPage({ params }: KanbanPageProps) {
       },
       members: {
         include: {
-          user: { select: { id: true, name: true, email: true, role: true } },
+          user: { select: { id: true, name: true, email: true, role: true, image: true } },
         },
       },
     },
@@ -57,6 +57,73 @@ export default async function WorkspaceKanbanPage({ params }: KanbanPageProps) {
   if (!workspace) {
     notFound();
   }
+
+  // Busca dinamicamente todos os usuários cadastrados e ativos no sistema
+  // (pesquisadores, líderes e professores ativos na plataforma)
+  const registeredUsers = await prisma.user.findMany({
+    where: {
+      status: { notIn: ["REJECTED", "SUSPENDED"] },
+    },
+    select: {
+      id: true,
+      name: true,
+      email: true,
+      image: true,
+      role: true,
+    },
+    orderBy: [
+      { name: "asc" },
+      { email: "asc" },
+    ],
+  });
+
+  // Mapeia por ID garantindo unicidade e disponibilizando todos os pesquisadores para atribuição dinâmica
+  const assignableUsersMap = new Map<
+    string,
+    {
+      id: string;
+      name: string | null;
+      email: string | null;
+      image?: string | null;
+      role?: string;
+    }
+  >();
+
+  // 1. Prioriza todos os usuários reais cadastrados no banco
+  for (const u of registeredUsers) {
+    assignableUsersMap.set(u.id, u);
+  }
+
+  // 2. Inclui quaisquer membros já vinculados ao workspace
+  for (const m of workspace.members) {
+    if (m.user && !assignableUsersMap.has(m.user.id)) {
+      assignableUsersMap.set(m.user.id, {
+        id: m.user.id,
+        name: m.user.name,
+        email: m.user.email,
+        image: m.user.image,
+        role: m.user.role,
+      });
+    }
+  }
+
+  // 3. Inclui quaisquer pesquisadores que já estejam atribuídos em tarefas existentes
+  for (const col of workspace.columns) {
+    for (const t of col.tasks) {
+      for (const a of t.assignees) {
+        if (a.user && !assignableUsersMap.has(a.user.id)) {
+          assignableUsersMap.set(a.user.id, {
+            id: a.user.id,
+            name: a.user.name,
+            email: a.user.email || null,
+            image: a.user.image,
+          });
+        }
+      }
+    }
+  }
+
+  const assignableUsers = Array.from(assignableUsersMap.values());
 
   return (
     <div className="space-y-6">
@@ -86,6 +153,7 @@ export default async function WorkspaceKanbanPage({ params }: KanbanPageProps) {
         <KanbanHeaderActions
           workspaceId={workspace.id}
           columns={workspace.columns.map((c) => ({ id: c.id, title: c.title }))}
+          workspaceMembers={assignableUsers}
         />
       </div>
 
@@ -94,7 +162,7 @@ export default async function WorkspaceKanbanPage({ params }: KanbanPageProps) {
         workspaceId={workspace.id}
         workspaceName={workspace.name}
         columns={workspace.columns as any}
-        workspaceMembers={workspace.members.map((m) => m.user)}
+        workspaceMembers={assignableUsers}
       />
     </div>
   );

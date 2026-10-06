@@ -599,6 +599,7 @@ export function KanbanBoard({
         workspaceId={workspaceId}
         columns={columnsState.map((c) => ({ id: c.id, title: c.title }))}
         defaultColumnId={quickCreateColumnId || undefined}
+        workspaceMembers={workspaceMembers}
       />
     </>
   );

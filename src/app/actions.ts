@@ -30,7 +30,9 @@ export async function getAuthenticatedUser() {
     const email = session.user.email.toLowerCase();
     const isCoordinator =
       email === "evandro.coggo@unifesp.br" ||
-      email === "vitor.antonio@unifesp.br";
+      email.startsWith("evandro.") ||
+      email === "vitor.antonio@unifesp.br" ||
+      email === "vitor.silva@unifesp.br";
 
     user = await prisma.user.create({
       data: {
@@ -450,6 +452,7 @@ export interface CreateTaskInput {
   priority?: "LOW" | "MEDIUM" | "HIGH" | "URGENT";
   dueDate?: string;
   allowSelfAssign?: boolean;
+  assigneeUserIds?: string[];
 }
 
 /**
@@ -496,7 +499,10 @@ export async function createTask(data: CreateTaskInput) {
         createdById: user.id,
         order: taskCount,
         assignees: {
-          create: [{ userId: user.id }],
+          create:
+            data.assigneeUserIds && data.assigneeUserIds.length > 0
+              ? data.assigneeUserIds.map((userId) => ({ userId }))
+              : [{ userId: user.id }],
         },
       },
     });
@@ -767,6 +773,24 @@ export async function updateTask(data: UpdateTaskInput) {
           })),
           skipDuplicates: true,
         });
+
+        // Garante automaticamente que os usuários atribuídos à tarefa também sejam membros do workspace
+        for (const userId of data.assigneeUserIds) {
+          await prisma.workspaceMember.upsert({
+            where: {
+              workspaceId_userId: {
+                workspaceId: data.workspaceId,
+                userId,
+              },
+            },
+            create: {
+              workspaceId: data.workspaceId,
+              userId,
+              role: "MEMBER",
+            },
+            update: {},
+          });
+        }
       }
     }
 

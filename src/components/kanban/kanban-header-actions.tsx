@@ -6,12 +6,15 @@ import { Plus, BookOpen } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { CreateTaskDialog } from "@/components/modals/create-task-dialog";
 
+import type { WorkspaceMemberInfo } from "@/components/kanban/task-detail-dialog";
+
 interface KanbanHeaderActionsProps {
   workspaceId: string;
   columns: { id: string; title: string }[];
+  workspaceMembers?: WorkspaceMemberInfo[];
 }
 
-export function KanbanHeaderActions({ workspaceId, columns }: KanbanHeaderActionsProps) {
+export function KanbanHeaderActions({ workspaceId, columns, workspaceMembers = [] }: KanbanHeaderActionsProps) {
   const [isCreateTaskOpen, setIsCreateTaskOpen] = useState(false);
 
   return (
@@ -37,6 +40,7 @@ export function KanbanHeaderActions({ workspaceId, columns }: KanbanHeaderAction
         onClose={() => setIsCreateTaskOpen(false)}
         workspaceId={workspaceId}
         columns={columns}
+        workspaceMembers={workspaceMembers}
       />
     </div>
   );

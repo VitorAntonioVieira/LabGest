@@ -39,7 +39,8 @@ export const authOptions: NextAuthOptions = {
         const isCoordinator =
           email === "evandro.coggo@unifesp.br" ||
           email.startsWith("evandro.") ||
-          email === "vitor.antonio@unifesp.br";
+          email === "vitor.antonio@unifesp.br" ||
+          email === "vitor.silva@unifesp.br";
 
         const initialRole: UserRole = isCoordinator ? "PROFESSOR" : "STUDENT";
         const initialStatus: UserStatus = isCoordinator ? "ACTIVE" : "PENDING";
@@ -83,7 +84,8 @@ export const authOptions: NextAuthOptions = {
         if (!dbUser && isEmailAllowed(token.email)) {
           const isCoordinator =
             token.email === "evandro.coggo@unifesp.br" ||
-            token.email === "vitor.antonio@unifesp.br";
+            token.email === "vitor.antonio@unifesp.br" ||
+            token.email === "vitor.silva@unifesp.br";
 
           dbUser = await prisma.user.create({
             data: {

@@ -2,10 +2,12 @@
 
 import React, { useState, useEffect, useTransition } from "react";
 import { createPortal } from "react-dom";
-import { KanbanSquare, X, Loader2, Plus, Calendar, Flag } from "lucide-react";
+import { KanbanSquare, X, Loader2, Plus, Calendar, Flag, User } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { createTask } from "@/app/actions";
+import { cn } from "@/lib/utils";
+import type { WorkspaceMemberInfo } from "@/components/kanban/task-detail-dialog";
 
 interface ColumnOption {
   id: string;
@@ -18,6 +20,7 @@ interface CreateTaskDialogProps {
   workspaceId: string;
   columns?: ColumnOption[];
   defaultColumnId?: string;
+  workspaceMembers?: WorkspaceMemberInfo[];
 }
 
 export function CreateTaskDialog({
@@ -26,6 +29,7 @@ export function CreateTaskDialog({
   workspaceId,
   columns = [],
   defaultColumnId,
+  workspaceMembers = [],
 }: CreateTaskDialogProps) {
   const [mounted, setMounted] = useState(false);
   const [isPending, startTransition] = useTransition();
@@ -34,6 +38,7 @@ export function CreateTaskDialog({
   const [columnId, setColumnId] = useState(defaultColumnId || columns[0]?.id || "");
   const [priority, setPriority] = useState<"LOW" | "MEDIUM" | "HIGH" | "URGENT">("MEDIUM");
   const [dueDate, setDueDate] = useState("");
+  const [selectedAssigneeIds, setSelectedAssigneeIds] = useState<string[]>([]);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
   useEffect(() => {
@@ -79,10 +84,12 @@ export function CreateTaskDialog({
           priority,
           dueDate: dueDate || undefined,
           allowSelfAssign: true,
+          assigneeUserIds: selectedAssigneeIds.length > 0 ? selectedAssigneeIds : undefined,
         });
         setTitle("");
         setDescription("");
         setDueDate("");
+        setSelectedAssigneeIds([]);
         onClose();
       } catch (err: any) {
         setErrorMsg(err.message || "Erro ao criar atividade.");
@@ -199,6 +206,46 @@ export function CreateTaskDialog({
               className="w-full rounded-md border border-input bg-background p-3 text-xs text-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary resize-none"
             />
           </div>
+
+          {workspaceMembers.length > 0 && (
+            <div className="space-y-1.5">
+              <label className="text-xs font-semibold text-foreground flex items-center justify-between">
+                <span className="flex items-center gap-1">
+                  <User className="h-3 w-3 text-primary" /> Atribuir Pesquisadores (Opcional)
+                </span>
+                <span className="text-[10px] text-muted-foreground font-normal">
+                  {selectedAssigneeIds.length} selecionado(s)
+                </span>
+              </label>
+              <div className="flex flex-wrap gap-1.5 max-h-24 overflow-y-auto p-1.5 rounded-md border border-input bg-background/50">
+                {workspaceMembers.map((m) => {
+                  const isAssigned = selectedAssigneeIds.includes(m.id);
+                  return (
+                    <button
+                      type="button"
+                      key={m.id}
+                      onClick={() => {
+                        if (isAssigned) {
+                          setSelectedAssigneeIds((prev) => prev.filter((id) => id !== m.id));
+                        } else {
+                          setSelectedAssigneeIds((prev) => [...prev, m.id]);
+                        }
+                      }}
+                      className={cn(
+                        "flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-medium border transition-all cursor-pointer",
+                        isAssigned
+                          ? "bg-primary/10 border-primary text-primary font-semibold"
+                          : "bg-muted/40 border-border text-muted-foreground hover:bg-muted hover:text-foreground"
+                      )}
+                    >
+                      <span>{m.name || m.email || "Pesquisador"}</span>
+                      {isAssigned && <span className="text-[10px] font-bold text-primary">✓</span>}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
 
           <div className="flex items-center justify-end gap-2 pt-2 border-t border-border">
             <Button

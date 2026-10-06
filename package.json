@@ -11,7 +11,8 @@
     "prisma:migrate": "prisma migrate dev",
     "prisma:studio": "prisma studio",
     "db:push": "prisma db push",
-    "db:seed": "npx tsx prisma/seed.ts"
+    "db:seed": "npx tsx prisma/seed.ts",
+    "db:cleanup-mocks": "node scripts/cleanup-mock-users.js"
   },
   "prisma": {
     "seed": "npx tsx prisma/seed.ts"
