@@ -2,8 +2,9 @@
 
 import React, { useMemo } from "react";
 import "@blocknote/core/fonts/inter.css";
-import "@blocknote/react/style.css";
-import { BlockNoteViewRaw as BlockNoteView, useCreateBlockNote } from "@blocknote/react";
+import "@blocknote/mantine/style.css";
+import { BlockNoteView } from "@blocknote/mantine";
+import { useCreateBlockNote } from "@blocknote/react";
 import { Block } from "@blocknote/core";
 
 interface BlockEditorProps {

@@ -47,6 +47,46 @@ const BlockEditor = dynamic(() => import("./block-editor"), {
   ),
 });
 
+// Error Boundary protetivo para o editor de blocos
+class EditorErrorBoundary extends React.Component<
+  { children: React.ReactNode },
+  { hasError: boolean; error: any }
+> {
+  constructor(props: any) {
+    super(props);
+    this.state = { hasError: false, error: null };
+  }
+
+  static getDerivedStateFromError(error: any) {
+    return { hasError: true, error };
+  }
+
+  componentDidCatch(error: any, errorInfo: any) {
+    console.error("[EditorErrorBoundary] Erro no editor:", error, errorInfo);
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div className="rounded-xl border border-destructive/20 bg-destructive/5 p-6 my-4 text-xs space-y-2 text-foreground">
+          <p className="font-bold text-destructive">Instabilidade temporária no editor de blocos.</p>
+          <p className="text-muted-foreground text-[11px]">
+            O documento está salvo com segurança. Você pode continuar editando o título, capa e ícone.
+          </p>
+          <button
+            type="button"
+            onClick={() => this.setState({ hasError: false, error: null })}
+            className="px-3 py-1.5 bg-primary text-primary-foreground rounded-md text-[11px] font-semibold hover:bg-primary/90 transition-all mt-2"
+          >
+            Tentar recarregar editor
+          </button>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
+
 export interface SiblingDocument {
   id: string;
   title: string;
@@ -751,14 +791,16 @@ export function DocumentEditor({
               )}
             </div>
 
-            {/* BlockNote Interactive Rich Editor */}
+            {/* BlockNote Interactive Rich Editor protegido por Error Boundary */}
             <div className="prose dark:prose-invert max-w-none">
-              <BlockEditor
-                initialContent={content}
-                onChange={handleContentChange}
-                editable={true}
-                theme={isDark ? "dark" : "light"}
-              />
+              <EditorErrorBoundary>
+                <BlockEditor
+                  initialContent={content}
+                  onChange={handleContentChange}
+                  editable={true}
+                  theme={isDark ? "dark" : "light"}
+                />
+              </EditorErrorBoundary>
             </div>
           </div>
         </div>

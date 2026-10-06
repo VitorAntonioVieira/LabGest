@@ -4,6 +4,47 @@ import { getServerSession } from "next-auth";
 import { revalidatePath } from "next/cache";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { isEmailAllowed } from "@/lib/auth-utils";
+
+/**
+ * Helper central de autenticação e resiliência de sessão
+ * Garante que o usuário retornado EXISTE no PostgreSQL, auto-recuperando
+ * sessões legadas (cookies de bancos anteriores) e auto-provisionando usuários institucionais.
+ */
+export async function getAuthenticatedUser() {
+  const session = await getServerSession(authOptions);
+  if (!session?.user) return null;
+
+  // 1. Tenta buscar pelo ID registrado na sessão
+  let user = session.user.id
+    ? await prisma.user.findUnique({ where: { id: session.user.id } })
+    : null;
+
+  // 2. Se não encontrar (token de banco anterior ou ID órfão), busca pelo e-mail
+  if (!user && session.user.email) {
+    user = await prisma.user.findUnique({ where: { email: session.user.email } });
+  }
+
+  // 3. Se ainda não existir no banco mas possui e-mail institucional válido, auto-provisiona no PostgreSQL
+  if (!user && session.user.email && isEmailAllowed(session.user.email)) {
+    const email = session.user.email.toLowerCase();
+    const isCoordinator =
+      email === "evandro.coggo@unifesp.br" ||
+      email === "vitor.antonio@unifesp.br";
+
+    user = await prisma.user.create({
+      data: {
+        email,
+        name: session.user.name || "Pesquisador UNIFESP",
+        image: session.user.image,
+        role: isCoordinator ? "PROFESSOR" : "STUDENT",
+        status: isCoordinator ? "ACTIVE" : "PENDING",
+      },
+    });
+  }
+
+  return user;
+}
 
 export interface TimeEntryInput {
   taskTitle?: string;
@@ -18,14 +59,14 @@ export interface TimeEntryInput {
  * Server Action: Aprovar Workspace (Restrito ao PROFESSOR)
  */
 export async function approveWorkspace(workspaceId: string) {
-  const session = await getServerSession(authOptions);
+  const user = await getAuthenticatedUser();
 
-  if (!session?.user?.id) {
-    throw new Error("Não autenticado.");
+  if (!user) {
+    throw new Error("Não autenticado. Por favor, faça login.");
   }
 
   // Validação estrita de RBAC
-  if (session.user.role !== "PROFESSOR") {
+  if (user.role !== "PROFESSOR") {
     throw new Error("Acesso negado: apenas Professores podem aprovar novos espaços de trabalho.");
   }
 
@@ -34,7 +75,7 @@ export async function approveWorkspace(workspaceId: string) {
       where: { id: workspaceId },
       data: {
         status: "APPROVED",
-        approvedById: session.user.id,
+        approvedById: user.id,
         approvedAt: new Date(),
       },
     });
@@ -52,13 +93,13 @@ export async function approveWorkspace(workspaceId: string) {
  * Server Action: Recusar Workspace com justificativa (Restrito ao PROFESSOR)
  */
 export async function rejectWorkspace(workspaceId: string, rejectionNotes?: string) {
-  const session = await getServerSession(authOptions);
+  const user = await getAuthenticatedUser();
 
-  if (!session?.user?.id) {
-    throw new Error("Não autenticado.");
+  if (!user) {
+    throw new Error("Não autenticado. Por favor, faça login.");
   }
 
-  if (session.user.role !== "PROFESSOR") {
+  if (user.role !== "PROFESSOR") {
     throw new Error("Acesso negado: apenas Professores podem avaliar espaços de trabalho.");
   }
 
@@ -68,7 +109,7 @@ export async function rejectWorkspace(workspaceId: string, rejectionNotes?: stri
       data: {
         status: "REJECTED",
         rejectionNotes: rejectionNotes || "Solicitação não atende aos requisitos do laboratório.",
-        approvedById: session.user.id,
+        approvedById: user.id,
       },
     });
 
@@ -85,10 +126,10 @@ export async function rejectWorkspace(workspaceId: string, rejectionNotes?: stri
  * Server Action: Criar Apontamento de Horas (Time Entry)
  */
 export async function createTimeEntry(data: TimeEntryInput) {
-  const session = await getServerSession(authOptions);
+  const user = await getAuthenticatedUser();
 
-  if (!session?.user?.id) {
-    throw new Error("Usuário não autenticado.");
+  if (!user) {
+    throw new Error("Usuário não autenticado. Por favor, faça login.");
   }
 
   if (!data.summary || data.summary.trim() === "") {
@@ -129,7 +170,7 @@ export async function createTimeEntry(data: TimeEntryInput) {
             slug: "pesquisa-geral",
             department: "Living Lab CTPP",
             status: "APPROVED",
-            requestedById: session.user.id,
+            requestedById: user.id,
             columns: {
               create: [
                 { title: "A Fazer", order: 0 },
@@ -151,11 +192,11 @@ export async function createTimeEntry(data: TimeEntryInput) {
           title: data.taskTitle?.trim() || "Atividade de Pesquisa",
           workspaceId: targetWorkspace.id,
           columnId: defaultColumn.id,
-          createdById: session.user.id,
+          createdById: user.id,
           allowSelfAssign: true,
           assignees: {
             create: {
-              userId: session.user.id,
+              userId: user.id,
             },
           },
         },
@@ -166,7 +207,7 @@ export async function createTimeEntry(data: TimeEntryInput) {
     // Cria o registro de horas
     const newEntry = await prisma.timeEntry.create({
       data: {
-        userId: session.user.id,
+        userId: user.id,
         taskId: resolvedTaskId,
         workspaceId: resolvedWorkspaceId,
         date: new Date(data.date || new Date()),
@@ -196,10 +237,10 @@ export interface OnboardingInput {
  * Transaciona o usuário de PENDING para WAITING_APPROVAL
  */
 export async function completeOnboarding(data: OnboardingInput) {
-  const session = await getServerSession(authOptions);
+  const user = await getAuthenticatedUser();
 
-  if (!session?.user?.id) {
-    throw new Error("Não autenticado.");
+  if (!user) {
+    throw new Error("Não autenticado. Por favor, faça login.");
   }
 
   if (!data.academicId || data.academicId.trim() === "") {
@@ -212,7 +253,7 @@ export async function completeOnboarding(data: OnboardingInput) {
 
   try {
     const updated = await prisma.user.update({
-      where: { id: session.user.id },
+      where: { id: user.id },
       data: {
         academicId: data.academicId.trim(),
         phone: data.phone.trim(),
@@ -242,13 +283,13 @@ export interface TriageInput {
  * Atribui a Role final, homologa status para ACTIVE e associa aos braços do lab
  */
 export async function triageAndApproveUser(data: TriageInput) {
-  const session = await getServerSession(authOptions);
+  const user = await getAuthenticatedUser();
 
-  if (!session?.user?.id) {
-    throw new Error("Não autenticado.");
+  if (!user) {
+    throw new Error("Não autenticado. Por favor, faça login.");
   }
 
-  if (session.user.role !== "PROFESSOR") {
+  if (user.role !== "PROFESSOR") {
     throw new Error("Acesso negado: apenas a Coordenação Geral pode homologar membros.");
   }
 
@@ -258,7 +299,7 @@ export async function triageAndApproveUser(data: TriageInput) {
       data: {
         role: data.role,
         status: "ACTIVE",
-        approvedById: session.user.id,
+        approvedById: user.id,
         approvedAt: new Date(),
       },
     });
@@ -299,13 +340,13 @@ export async function triageAndApproveUser(data: TriageInput) {
  * Server Action: Recusar solicitação de ingresso do membro
  */
 export async function rejectPendingUser(userId: string) {
-  const session = await getServerSession(authOptions);
+  const user = await getAuthenticatedUser();
 
-  if (!session?.user?.id) {
-    throw new Error("Não autenticado.");
+  if (!user) {
+    throw new Error("Não autenticado. Por favor, faça login.");
   }
 
-  if (session.user.role !== "PROFESSOR") {
+  if (user.role !== "PROFESSOR") {
     throw new Error("Acesso negado.");
   }
 
@@ -314,7 +355,7 @@ export async function rejectPendingUser(userId: string) {
       where: { id: userId },
       data: {
         status: "REJECTED",
-        approvedById: session.user.id,
+        approvedById: user.id,
         approvedAt: new Date(),
       },
     });
@@ -338,10 +379,10 @@ export interface RequestWorkspaceInput {
  * Server Action: Solicitar Abertura de Novo Braço de Pesquisa (Workspace)
  */
 export async function requestWorkspace(data: RequestWorkspaceInput) {
-  const session = await getServerSession(authOptions);
+  const user = await getAuthenticatedUser();
 
-  if (!session?.user?.id) {
-    throw new Error("Não autenticado.");
+  if (!user) {
+    throw new Error("Não autenticado. Por favor, faça login.");
   }
 
   if (!data.name || data.name.trim() === "") {
@@ -359,7 +400,7 @@ export async function requestWorkspace(data: RequestWorkspaceInput) {
   const slug = `${baseSlug}-${randomSuffix}`;
 
   try {
-    const isProfessor = session.user.role === "PROFESSOR";
+    const isProfessor = user.role === "PROFESSOR";
     const initialStatus = isProfessor ? "APPROVED" : "PENDING";
 
     const workspace = await prisma.workspace.create({
@@ -369,8 +410,8 @@ export async function requestWorkspace(data: RequestWorkspaceInput) {
         department: data.department?.trim() || "Living Lab CTPP",
         description: data.description?.trim() || null,
         status: initialStatus,
-        requestedById: session.user.id,
-        approvedById: isProfessor ? session.user.id : null,
+        requestedById: user.id,
+        approvedById: isProfessor ? user.id : null,
         approvedAt: isProfessor ? new Date() : null,
         columns: {
           create: [
@@ -383,7 +424,7 @@ export async function requestWorkspace(data: RequestWorkspaceInput) {
         members: {
           create: [
             {
-              userId: session.user.id,
+              userId: user.id,
               role: isProfessor ? "OWNER" : "MEMBER",
             },
           ],
@@ -415,10 +456,10 @@ export interface CreateTaskInput {
  * Server Action: Criar Nova Atividade no Quadro Kanban
  */
 export async function createTask(data: CreateTaskInput) {
-  const session = await getServerSession(authOptions);
+  const user = await getAuthenticatedUser();
 
-  if (!session?.user?.id) {
-    throw new Error("Não autenticado.");
+  if (!user) {
+    throw new Error("Não autenticado. Por favor, faça login.");
   }
 
   if (!data.title || data.title.trim() === "") {
@@ -452,10 +493,10 @@ export async function createTask(data: CreateTaskInput) {
         allowSelfAssign: data.allowSelfAssign ?? true,
         workspaceId: data.workspaceId,
         columnId: targetColumnId,
-        createdById: session.user.id,
+        createdById: user.id,
         order: taskCount,
         assignees: {
-          create: [{ userId: session.user.id }],
+          create: [{ userId: user.id }],
         },
       },
     });
@@ -480,26 +521,10 @@ export interface CreateDocumentInput {
  * Server Action: Criar Nova Página de Documentação / Notas
  */
 export async function createDocument(data: CreateDocumentInput) {
-  const session = await getServerSession(authOptions);
+  const user = await getAuthenticatedUser();
 
-  if (!session?.user?.id && !session?.user?.email) {
+  if (!user) {
     throw new Error("Não autenticado. Por favor, faça login.");
-  }
-
-  // Busca o usuário atual no banco para garantir que o ID é válido e evitar violação de FK
-  let dbUser = session?.user?.id
-    ? await prisma.user.findUnique({ where: { id: session.user.id }, select: { id: true, name: true } })
-    : null;
-
-  if (!dbUser && session?.user?.email) {
-    dbUser = await prisma.user.findUnique({
-      where: { email: session.user.email },
-      select: { id: true, name: true },
-    });
-  }
-
-  if (!dbUser) {
-    throw new Error("Sessão expirada ou usuário não sincronizado. Por favor, recarregue a página ou faça login novamente.");
   }
 
   if (!data.title || data.title.trim() === "") {
@@ -513,14 +538,14 @@ export async function createDocument(data: CreateDocumentInput) {
         icon: data.icon || "📄",
         type: data.workspaceId ? "WORKSPACE" : (data.type || "PERSONAL"),
         workspaceId: data.workspaceId || null,
-        ownerId: dbUser.id,
+        ownerId: user.id,
         content: [
           {
             type: "paragraph",
             content: [
               {
                 type: "text",
-                text: `Criado por ${dbUser.name || session.user.name || "Pesquisador"} em ${new Date().toLocaleDateString("pt-BR")}.`,
+                text: `Criado por ${user.name || "Pesquisador"} em ${new Date().toLocaleDateString("pt-BR")}.`,
                 styles: {},
               },
             ],
@@ -558,13 +583,13 @@ export interface PlatformSettingsInput {
  * Server Action: Atualizar Configurações White-label da Plataforma (Restrito ao PROFESSOR)
  */
 export async function updatePlatformSettings(data: PlatformSettingsInput) {
-  const session = await getServerSession(authOptions);
+  const user = await getAuthenticatedUser();
 
-  if (!session?.user?.id) {
-    throw new Error("Não autenticado.");
+  if (!user) {
+    throw new Error("Não autenticado. Por favor, faça login.");
   }
 
-  if (session.user.role !== "PROFESSOR") {
+  if (user.role !== "PROFESSOR") {
     throw new Error("Apenas Professores e Coordenadores podem alterar as configurações da plataforma.");
   }
 
@@ -627,8 +652,8 @@ export interface CreateKanbanColumnInput {
  * Server Action: Criar Novo Bucket / Coluna no Kanban
  */
 export async function createKanbanColumn(data: CreateKanbanColumnInput) {
-  const session = await getServerSession(authOptions);
-  if (!session?.user?.id) throw new Error("Não autenticado.");
+  const user = await getAuthenticatedUser();
+  if (!user) throw new Error("Não autenticado. Por favor, faça login.");
   if (!data.title || data.title.trim() === "") {
     throw new Error("O nome do bucket/coluna é obrigatório.");
   }
@@ -675,8 +700,8 @@ export interface MoveTaskInput {
  * Server Action: Mover Card entre Buckets (Drag and Drop)
  */
 export async function moveTask(data: MoveTaskInput) {
-  const session = await getServerSession(authOptions);
-  if (!session?.user?.id) throw new Error("Não autenticado.");
+  const user = await getAuthenticatedUser();
+  if (!user) throw new Error("Não autenticado. Por favor, faça login.");
 
   try {
     const updated = await prisma.task.update({
@@ -710,8 +735,8 @@ export interface UpdateTaskInput {
  * Server Action: Atualizar Todos os Campos de uma Atividade (Edição Completa)
  */
 export async function updateTask(data: UpdateTaskInput) {
-  const session = await getServerSession(authOptions);
-  if (!session?.user?.id) throw new Error("Não autenticado.");
+  const user = await getAuthenticatedUser();
+  if (!user) throw new Error("Não autenticado. Por favor, faça login.");
   if (!data.title || data.title.trim() === "") {
     throw new Error("O título da atividade é obrigatório.");
   }
@@ -758,8 +783,8 @@ export async function updateTask(data: UpdateTaskInput) {
  * Server Action: Excluir Atividade do Kanban
  */
 export async function deleteTask(taskId: string, workspaceId: string) {
-  const session = await getServerSession(authOptions);
-  if (!session?.user?.id) throw new Error("Não autenticado.");
+  const user = await getAuthenticatedUser();
+  if (!user) throw new Error("Não autenticado. Por favor, faça login.");
 
   try {
     await prisma.task.delete({
@@ -788,9 +813,9 @@ export interface UpdateWorkspaceDocumentInput {
  * Server Action: Atualizar Conteúdo, Título ou Metadados do Caderno de Documentação (Notion-like)
  */
 export async function updateWorkspaceDocument(data: UpdateWorkspaceDocumentInput) {
-  const session = await getServerSession(authOptions);
-  if (!session?.user?.id) {
-    throw new Error("Não autenticado.");
+  const user = await getAuthenticatedUser();
+  if (!user) {
+    throw new Error("Não autenticado. Por favor, faça login.");
   }
 
   const existingDoc = await prisma.document.findUnique({
@@ -841,9 +866,9 @@ export async function updateWorkspaceDocument(data: UpdateWorkspaceDocumentInput
  * Server Action: Excluir Caderno de Documentação
  */
 export async function deleteWorkspaceDocument(docId: string, workspaceId?: string) {
-  const session = await getServerSession(authOptions);
-  if (!session?.user?.id) {
-    throw new Error("Não autenticado.");
+  const user = await getAuthenticatedUser();
+  if (!user) {
+    throw new Error("Não autenticado. Por favor, faça login.");
   }
 
   try {

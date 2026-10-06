@@ -123,6 +123,11 @@ stateDiagram-v2
   - [x] Exibição de autor e timestamp real da última alteração (`updatedAt`).
   - [x] Exclusão e confirmação de cadernos diretamente no editor com `deleteWorkspaceDocument`.
   - [x] Abertura direta do editor a partir dos cards de cadernos nos workspaces e na listagem central.
+  - [x] **Estabilização de Sessão & Editor BlockNote (Deploy Resiliente AWS):**
+    - [x] Helper central `getAuthenticatedUser()` protegendo todas as Server Actions contra violações de chave estrangeira (`Task_createdById_fkey`, `Workspace_approvedById_fkey`).
+    - [x] Auto-sincronização de usuário no callback JWT de NextAuth para tokens legados em bancos recriados.
+    - [x] Integração completa de `@blocknote/mantine` com menus flutuantes, comandos slash (`/`) e proteção por `EditorErrorBoundary`.
+    - [x] Inicialização idempotente do banco de dados no `docker-compose.yml` (`command: sh -c "npx prisma db push --skip-generate && npm start"`).
 
 
 ### Fase 6: Configurações White-label e Expansão

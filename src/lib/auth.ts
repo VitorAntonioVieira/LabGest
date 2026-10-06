@@ -70,14 +70,32 @@ export const authOptions: NextAuthOptions = {
     },
 
     /**
-     * Anexa o ID, Role e Status do Prisma ao token JWT
+     * Anexa o ID, Role e Status do Prisma ao token JWT com auto-sincronização resiliente
      */
     async jwt({ token }) {
       if (token.email) {
-        const dbUser = await prisma.user.findUnique({
+        let dbUser = await prisma.user.findUnique({
           where: { email: token.email },
           select: { id: true, role: true, status: true, name: true, image: true },
         });
+
+        // Se o banco foi resetado ou o token possui ID órfão, auto-provisiona no banco
+        if (!dbUser && isEmailAllowed(token.email)) {
+          const isCoordinator =
+            token.email === "evandro.coggo@unifesp.br" ||
+            token.email === "vitor.antonio@unifesp.br";
+
+          dbUser = await prisma.user.create({
+            data: {
+              email: token.email,
+              name: (token.name as string) || "Pesquisador UNIFESP",
+              image: (token.picture as string) || null,
+              role: isCoordinator ? "PROFESSOR" : "STUDENT",
+              status: isCoordinator ? "ACTIVE" : "PENDING",
+            },
+            select: { id: true, role: true, status: true, name: true, image: true },
+          });
+        }
 
         if (dbUser) {
           token.id = dbUser.id;

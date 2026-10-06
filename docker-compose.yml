@@ -47,6 +47,7 @@ services:
       - labgest-network
     expose:
       - "3000"
+    command: sh -c "npx prisma db push --skip-generate && npm start"
 
   caddy:
     image: caddy:2-alpine
