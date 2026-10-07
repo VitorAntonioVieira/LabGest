@@ -29,21 +29,24 @@
 
 ## 3. Regras de Negócio e Hierarquia (Roles & Status)
 
-### 3.1. Papéis de Usuário (`Role`)
-1. **`PROFESSOR` (Administrador / Coordenador Geral):**
-   - Acesso total à plataforma.
-   - Aprovação ou recusa de novos workspaces de pesquisa (`/admin/approvals`).
-   - Aprovação de novos alunos/bolsistas e atribuição aos seus respectivos workspaces.
+### 3.1. Papéis Institucionais (`Role`) e Atribuições Modulares (`Attribution`)
+1. **`PROFESSOR` (Professor / Coordenação Geral):**
+   - Acesso irrestrito a todas as áreas e configurações da plataforma.
+   - Triagem e homologação de novos integrantes e workspaces (`/admin/approvals`).
+   - Gestão de papéis institucionais e atribuições da equipe (`/members`).
    - Configuração de identidade visual e parâmetros institucionais (White-label).
-2. **`LEADER` (Pesquisador Líder / Pós-Doutorando / Co-coordenador):**
-   - Gestão de workspaces específicos onde foi designado como líder.
-   - Criação de buckets, atividades e atribuição de tarefas a pesquisadores.
-   - Validação dos relatórios de horas dos estudantes vinculados ao seu projeto.
-3. **`STUDENT` (Iniciação Científica / Mestrando / Bolsista):**
-   - Visualização dos workspaces aos quais pertence.
+2. **`LEADER` (Líder — Gestão):**
+   - Coordenação operacional e liderança dos workspaces aos quais pertence.
+   - Criação de colunas no Kanban, organização de atividades e alocação de integrantes.
+   - Acompanhamento de entregas e validação de relatórios de horas.
+3. **`STUDENT` (Integrante):**
+   - Membro da equipe do laboratório (bolsista, aluno ou colaborador técnico).
    - Movimentação de tarefas no Kanban (Drag & Drop) e alteração de status/campos.
-   - **Apontamento de horas de pesquisa** dentro das atividades ou no apontador geral.
-   - Redação de anotações no Caderno de Laboratório.
+   - Apontamento de horas nas atividades ou no apontador geral.
+   - Colaboração e redação de notas nos Cadernos do Workspace e Caderno Pessoal.
+
+> **Nota de Arquitetura (Modelo Flexível de Atribuições):**  
+> No Living Lab, nem todos os colaboradores trabalham estritamente com pesquisa científica. O sistema separa a **Função Institucional Base** (`Professor`, `Líder (Gestão)`, `Integrante`) das **Atribuições Modulares Dinâmicas** (`Attribution`), permitindo que integrantes acumulem especialidades (ex: *Gestão*, *Pesquisa*, *Infraestrutura & TI*, *Comunicação & Mídia*, *Administrativo & Financeiro*) e tenham acesso configurável a cada módulo do sistema.
 
 ### 3.2. Ciclo de Vida do Usuário (`UserStatus`)
 
@@ -139,6 +142,26 @@ stateDiagram-v2
 - [x] Painel interativo de **Exemplos de Estilização em Tempo Real (Showcase White-label)** com alternador de temas Claro/Escuro, simulação de aba do navegador, tipografia e componentes UI.
 - [x] Otimização e calibração de contraste no tema escuro (Dark Mode WCAG AAA para `--primary`, `--secondary`, botões e textos).
 - [ ] Exportação de relatórios de horas por bolsista e por projeto em CSV/PDF para prestação de contas FAPESP/CNPq.
+
+### Fase 7: Controle de Integrantes & Atribuições Customizáveis (RBAC Dinâmico e Multi-Atribuições)
+- [x] **Modelagem de Dados e Relacionamentos no Prisma:**
+  - [x] Modelos `Attribution` e `UserAttribution` com integridade referencial, cascata e índices em `prisma/schema.prisma`.
+  - [x] Relação n:n entre `User` e `Attribution` permitindo que integrantes acumulem múltiplas frentes de atuação.
+- [x] **Normalização Universal das Funções Institucionais:**
+  - [x] Rótulos institucionais normalizados: **`Professor`**, **`Líder (Gestão)`** e **`Integrante`**.
+  - [x] Substituição de termos restritivos como "Líder de Pesquisa" e "Pesquisador" em formulários, modais, cabeçalho e triagem.
+- [x] **Nova Aba / Rota de Controle de Integrantes (`/members`):**
+  - [x] Adição do link "Integrantes" na barra lateral de navegação (Sidebar).
+  - [x] Dashboard analítico com cards de métricas (Total de Integrantes, Ativos, Sala de Espera e Atribuições Criadas).
+  - [x] Aba de Integrantes com busca instantânea (nome, email, RA, curso), filtros combinados (função, status, atribuição) e alternador de visualização (Cards / Tabela).
+  - [x] Exibição de chips coloridos de todas as atribuições vinculadas a cada integrante.
+  - [x] Exibição em tempo real dos módulos do sistema acessíveis pelo integrante.
+- [x] **Gestão Modular de Atribuições & Matriz de Permissões:**
+  - [x] Aba dedicada para gestão de atribuições do laboratório.
+  - [x] Modal `AttributionDialog` para criação e edição de atribuições com nome, cor institucional (presets e color picker), descrição e seleção modular de acessos aos módulos (`workspaces`, `workspaces_admin`, `time_tracking`, `docs`, `calendar`, `members_view`, `members_manage`, `approvals`, `platform_settings`, `reports`).
+  - [x] Exclusão segura de atribuição com desvinculação em cascata.
+  - [x] Modal `EditMemberDialog` para alteração in-place da função institucional, status e seleção de múltiplas atribuições.
+  - [x] Seeding de atribuições padrão do Living Lab (Coordenação & Gestão, Pesquisa & Desenvolvimento, Infraestrutura & TI, Comunicação & Mídia, Administrativo & Financeiro).
 
 ---
 

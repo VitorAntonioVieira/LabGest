@@ -478,19 +478,19 @@ export function TaskDetailDialog({
                 </div>
               </div>
 
-              {/* 4. Pesquisadores Atribuídos (Seleção Interativa com Badges) */}
+              {/* 4. Integrantes Atribuídos (Seleção Interativa com Badges) */}
               <div className="rounded-lg border border-border/70 p-3 space-y-2 bg-card">
                 <div className="flex items-center justify-between">
                   <label className="text-[10px] font-semibold text-muted-foreground dark:text-zinc-300 uppercase tracking-wider flex items-center gap-1">
-                    <User className="h-3 w-3 text-primary dark:text-emerald-400" /> Pesquisadores Atribuídos
+                    <User className="h-3 w-3 text-primary dark:text-emerald-400" /> Integrantes Atribuídos
                   </label>
                   <span className="text-[10px] text-muted-foreground dark:text-zinc-400">
-                    Clique no pesquisador para atribuir ou desatribuir
+                    Clique no integrante para atribuir ou desatribuir
                   </span>
                 </div>
 
                 {availableMembers.length === 0 ? (
-                  <p className="text-xs text-muted-foreground italic">Nenhum pesquisador cadastrado no sistema.</p>
+                  <p className="text-xs text-muted-foreground italic">Nenhum integrante cadastrado no sistema.</p>
                 ) : (
                   <div className="flex flex-wrap gap-1.5">
                     {availableMembers.map((m) => {

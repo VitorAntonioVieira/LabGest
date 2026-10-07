@@ -17,6 +17,7 @@ import {
   Sparkles,
   Sliders,
   LogOut,
+  Users,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
@@ -60,7 +61,7 @@ export function Sidebar({
 
   // Usuário 100% dinâmico (prioriza SSR e fallback reativo para useSession)
   const user = {
-    name: currentUser?.name || session?.user?.name || "Pesquisador UNIFESP",
+    name: currentUser?.name || session?.user?.name || "Integrante UNIFESP",
     email: currentUser?.email || session?.user?.email || "",
     role: (currentUser?.role || session?.user?.role || "STUDENT") as UserRole,
     avatarUrl: currentUser?.avatarUrl || session?.user?.image || undefined,
@@ -77,6 +78,11 @@ export function Sidebar({
       href: "/workspaces",
       icon: FolderGit2,
       badge: activeWorkspacesCount > 0 ? `${activeWorkspacesCount} Ativos` : undefined,
+    },
+    {
+      title: "Integrantes",
+      href: "/members",
+      icon: Users,
     },
     {
       title: "Calendário do Lab",
@@ -335,7 +341,11 @@ export function Sidebar({
                   }
                   className="text-[9px] px-1 py-0 h-3.5 leading-none font-medium"
                 >
-                  {user.role}
+                  {user.role === "PROFESSOR"
+                    ? "Professor"
+                    : user.role === "LEADER"
+                    ? "Líder (Gestão)"
+                    : "Integrante"}
                 </Badge>
                 <span className="truncate text-[10px] text-muted-foreground">
                   UNIFESP

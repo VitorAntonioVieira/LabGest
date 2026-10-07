@@ -211,7 +211,7 @@ export function CreateTaskDialog({
             <div className="space-y-1.5">
               <label className="text-xs font-semibold text-foreground flex items-center justify-between">
                 <span className="flex items-center gap-1">
-                  <User className="h-3 w-3 text-primary" /> Atribuir Pesquisadores (Opcional)
+                  <User className="h-3 w-3 text-primary" /> Atribuir Integrantes (Opcional)
                 </span>
                 <span className="text-[10px] text-muted-foreground font-normal">
                   {selectedAssigneeIds.length} selecionado(s)
@@ -238,7 +238,7 @@ export function CreateTaskDialog({
                           : "bg-muted/40 border-border text-muted-foreground hover:bg-muted hover:text-foreground"
                       )}
                     >
-                      <span>{m.name || m.email || "Pesquisador"}</span>
+                      <span>{m.name || m.email || "Integrante"}</span>
                       {isAssigned && <span className="text-[10px] font-bold text-primary">✓</span>}
                     </button>
                   );

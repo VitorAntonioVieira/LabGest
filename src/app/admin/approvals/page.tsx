@@ -109,19 +109,19 @@ export default async function AdminApprovalsPage() {
             Nenhuma solicitação pendente
           </CardTitle>
           <CardDescription className="text-xs max-w-sm mx-auto mt-1">
-            Todas as inscrições de pesquisadores e solicitações de espaços de trabalho estão em dia.
+            Todas as inscrições de integrantes e solicitações de espaços de trabalho estão em dia.
           </CardDescription>
         </Card>
       )}
 
-      {/* Relação de Pesquisadores Ativos */}
+      {/* Relação de Integrantes Ativos */}
       <Card className="border border-border shadow-2xs">
         <CardHeader className="pb-3">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
               <Users className="h-5 w-5 text-primary" />
               <CardTitle className="text-sm font-bold text-foreground">
-                Pesquisadores & Membros Homologados ({activeUsers.length})
+                Integrantes Homologados ({activeUsers.length})
               </CardTitle>
             </div>
             <Badge variant="outline" className="text-[10px]">
@@ -139,7 +139,7 @@ export default async function AdminApprovalsPage() {
                 <tr className="border-b border-border/80 text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">
                   <th className="pb-2">Nome</th>
                   <th className="pb-2">E-mail</th>
-                  <th className="pb-2">Papel (Role)</th>
+                  <th className="pb-2">Função</th>
                   <th className="pb-2">RA</th>
                   <th className="pb-2">Contato</th>
                   <th className="pb-2">Curso / Área</th>
@@ -149,7 +149,7 @@ export default async function AdminApprovalsPage() {
                 {activeUsers.map((user) => (
                   <tr key={user.id} className="hover:bg-muted/30 transition-colors">
                     <td className="py-2.5 font-semibold text-foreground">
-                      {user.name || "Pesquisador"}
+                      {user.name || "Integrante"}
                     </td>
                     <td className="py-2.5 font-mono text-[11px] text-muted-foreground">
                       {user.email}
@@ -165,7 +165,11 @@ export default async function AdminApprovalsPage() {
                         }
                         className="text-[10px] px-1.5 py-0 h-4"
                       >
-                        {user.role}
+                        {user.role === "PROFESSOR"
+                          ? "Professor"
+                          : user.role === "LEADER"
+                          ? "Líder (Gestão)"
+                          : "Integrante"}
                       </Badge>
                     </td>
                     <td className="py-2.5 text-muted-foreground">

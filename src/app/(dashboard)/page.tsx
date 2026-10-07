@@ -30,7 +30,7 @@ export default async function DashboardPage() {
 
   const userId = session.user.id;
   const userRole = session.user.role;
-  const userName = session.user.name || "Pesquisador";
+  const userName = session.user.name || "Integrante";
 
   // 2. Busca de Dados Reais no Prisma
 
@@ -440,7 +440,7 @@ export default async function DashboardPage() {
                     <div className="flex items-center justify-between text-xs text-muted-foreground pt-1 border-t border-border/60">
                       <span className="flex items-center gap-1">
                         <Users className="h-3.5 w-3.5 text-muted-foreground" />{" "}
-                        {ws._count.members} pesquisadores
+                        {ws._count.members} integrantes
                       </span>
                       <span className="flex items-center gap-1">
                         <Layers className="h-3.5 w-3.5 text-muted-foreground" />{" "}

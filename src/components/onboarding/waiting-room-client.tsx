@@ -87,7 +87,7 @@ export function WaitingRoomClient({ user }: WaitingRoomClientProps) {
             </Badge>
           </div>
           <p className="text-[11px] text-amber-800/90 dark:text-amber-300/80 leading-relaxed">
-            Durante a triagem, o professor coordenador definirá o seu papel (Pesquisador ou Líder) e alocará o seu perfil nos braços de pesquisa correspondentes.
+            Durante a triagem, a coordenação definirá sua função (Integrante ou Líder), suas atribuições no laboratório e alocará seu perfil nos projetos correspondentes.
           </p>
         </div>
 
@@ -99,7 +99,7 @@ export function WaitingRoomClient({ user }: WaitingRoomClientProps) {
           <div className="grid grid-cols-2 gap-2 text-[11px]">
             <div>
               <span className="text-muted-foreground">Nome:</span>
-              <p className="font-medium text-foreground">{user.name || "Pesquisador"}</p>
+              <p className="font-medium text-foreground">{user.name || "Integrante"}</p>
             </div>
             <div>
               <span className="text-muted-foreground">E-mail:</span>

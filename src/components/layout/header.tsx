@@ -88,13 +88,17 @@ export function Header() {
               <div className="absolute right-0 mt-2 w-56 rounded-xl border border-border bg-card p-2 shadow-xl animate-in fade-in zoom-in-95 duration-100 z-50">
                 <div className="px-3 py-2 border-b border-border/60">
                   <p className="text-xs font-bold text-foreground truncate">
-                    {session?.user?.name || "Pesquisador"}
+                    {session?.user?.name || "Integrante"}
                   </p>
                   <p className="text-[10px] text-muted-foreground truncate font-mono">
                     {session?.user?.email}
                   </p>
                   <span className="inline-block mt-1 text-[9px] font-semibold uppercase px-1.5 py-0.5 rounded bg-primary/10 text-primary">
-                    {session?.user?.role || "STUDENT"}
+                    {session?.user?.role === "PROFESSOR"
+                      ? "Professor"
+                      : session?.user?.role === "LEADER"
+                      ? "Líder (Gestão)"
+                      : "Integrante"}
                   </span>
                 </div>
 

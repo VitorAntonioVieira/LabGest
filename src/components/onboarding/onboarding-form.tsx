@@ -91,10 +91,10 @@ export function OnboardingForm({ user }: OnboardingFormProps) {
         </p>
 
         <CardTitle className="text-lg font-bold text-foreground mt-3">
-          Completar Perfil de Pesquisador
+          Completar Perfil de Integrante
         </CardTitle>
         <CardDescription className="text-xs max-w-sm mx-auto mt-1">
-          Informe seus dados acadêmicos para que a Coordenação do Lab homologue sua entrada e vincule você aos braços de pesquisa.
+          Informe seus dados acadêmicos para que a Coordenação do Lab homologue sua entrada e vincule você aos braços e projetos.
         </CardDescription>
       </CardHeader>
 
@@ -110,7 +110,7 @@ export function OnboardingForm({ user }: OnboardingFormProps) {
           <div className="rounded-lg bg-muted/40 p-3 text-xs space-y-1 border border-border/60">
             <div className="flex items-center justify-between">
               <span className="text-[11px] text-muted-foreground">Nome:</span>
-              <span className="font-semibold text-foreground">{user.name || "Pesquisador"}</span>
+              <span className="font-semibold text-foreground">{user.name || "Integrante"}</span>
             </div>
             <div className="flex items-center justify-between">
               <span className="text-[11px] text-muted-foreground">E-mail:</span>

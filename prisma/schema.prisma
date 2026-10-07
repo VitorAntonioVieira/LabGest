@@ -13,9 +13,9 @@ datasource db {
 // ==========================================
 
 enum UserRole {
-  PROFESSOR // Administrador Geral: gerencia tudo, aprova workspaces, emite certificados
-  LEADER    // Líder de Pesquisa: gerencia Kanban e membros do seu Workspace
-  STUDENT   // Integrante Base: executa tarefas, aponta horas e redige anotações
+  PROFESSOR // Professor / Coordenação Geral: gerencia tudo, aprova workspaces e membros
+  LEADER    // Líder (Gestão): gerencia Kanban e membros do seu Workspace
+  STUDENT   // Integrante: executa tarefas, aponta horas e redige anotações
 }
 
 enum UserStatus {
@@ -144,6 +144,9 @@ model User {
 
   // Relações com Documentos (Notion-like)
   documents            Document[]
+
+  // Relações com Atribuições Dinâmicas
+  attributions         UserAttribution[]
 
   @@index([status])
   @@index([role])
@@ -385,3 +388,37 @@ model PlatformSettings {
   supportEmail    String?  @default("contato@labctpp.unifesp.br")
   updatedAt       DateTime @updatedAt
 }
+
+// ==========================================
+// 9. ATRIBUIÇÕES E PERMISSÕES DE ACESSO (RBAC DINÂMICO)
+// ==========================================
+
+model Attribution {
+  id          String   @id @default(cuid())
+  name        String   @unique
+  slug        String   @unique
+  description String?  @db.Text
+  color       String   @default("#0E4734")
+  permissions String[] // Permissões de módulos: "workspaces", "workspaces_admin", "time_tracking", "docs", "calendar", "members_view", "members_manage", "approvals", "platform_settings", "reports"
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  users       UserAttribution[]
+
+  @@index([slug])
+}
+
+model UserAttribution {
+  id            String      @id @default(cuid())
+  userId        String
+  attributionId String
+  assignedAt    DateTime    @default(now())
+
+  user          User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  attribution   Attribution @relation(fields: [attributionId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, attributionId])
+  @@index([userId])
+  @@index([attributionId])
+}
+

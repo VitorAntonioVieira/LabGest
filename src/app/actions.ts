@@ -37,7 +37,7 @@ export async function getAuthenticatedUser() {
     user = await prisma.user.create({
       data: {
         email,
-        name: session.user.name || "Pesquisador UNIFESP",
+        name: session.user.name || "Integrante UNIFESP",
         image: session.user.image,
         role: isCoordinator ? "PROFESSOR" : "STUDENT",
         status: isCoordinator ? "ACTIVE" : "PENDING",
@@ -551,7 +551,7 @@ export async function createDocument(data: CreateDocumentInput) {
             content: [
               {
                 type: "text",
-                text: `Criado por ${user.name || "Pesquisador"} em ${new Date().toLocaleDateString("pt-BR")}.`,
+                text: `Criado por ${user.name || "Integrante"} em ${new Date().toLocaleDateString("pt-BR")}.`,
                 styles: {},
               },
             ],
@@ -911,4 +911,329 @@ export async function deleteWorkspaceDocument(docId: string, workspaceId?: strin
     throw new Error("Erro ao excluir caderno de documentação.");
   }
 }
+
+// ==========================================
+// 10. CONTROLE DE INTEGRANTES & ATRIBUIÇÕES (RBAC DINÂMICO)
+// ==========================================
+
+const DEFAULT_ATTRIBUTIONS = [
+  {
+    name: "Coordenação & Gestão",
+    slug: "coordenacao-gestao",
+    description: "Coordenação institucional, gestão de pessoas, aprovação de projetos e alocação de recursos.",
+    color: "#24576C",
+    permissions: [
+      "workspaces",
+      "workspaces_admin",
+      "time_tracking",
+      "docs",
+      "calendar",
+      "members_view",
+      "members_manage",
+      "approvals",
+      "platform_settings",
+      "reports",
+    ],
+  },
+  {
+    name: "Pesquisa & Desenvolvimento",
+    slug: "pesquisa-desenvolvimento",
+    description: "Condução de investigações científicas, produção de artigos acadêmicos e relatórios técnicos.",
+    color: "#0E4330",
+    permissions: ["workspaces", "time_tracking", "docs", "calendar", "members_view"],
+  },
+  {
+    name: "Infraestrutura & Tecnologia",
+    slug: "infraestrutura-tecnologia",
+    description: "Desenvolvimento do sistema, suporte a servidores, banco de dados e automação do laboratório.",
+    color: "#4F46E5",
+    permissions: [
+      "workspaces",
+      "workspaces_admin",
+      "time_tracking",
+      "docs",
+      "calendar",
+      "members_view",
+      "members_manage",
+      "platform_settings",
+    ],
+  },
+  {
+    name: "Comunicação & Mídia",
+    slug: "comunicacao-midia",
+    description: "Divulgação científica, mídias sociais, design gráfico e comunicação institucional.",
+    color: "#D97706",
+    permissions: ["workspaces", "time_tracking", "docs", "calendar", "members_view"],
+  },
+  {
+    name: "Administrativo & Financeiro",
+    slug: "administrativo-financeiro",
+    description: "Gestão documental, apoio a bolsas de pesquisa, prestação de contas e compras.",
+    color: "#059669",
+    permissions: ["workspaces", "time_tracking", "docs", "calendar", "members_view", "reports"],
+  },
+];
+
+/**
+ * Busca todas as atribuições cadastradas no sistema (com contagem de integrantes)
+ */
+export async function getLabAttributions() {
+  try {
+    // Garante que as atribuições padrão existam se a tabela estiver vazia
+    const count = await prisma.attribution.count();
+    if (count === 0) {
+      for (const attr of DEFAULT_ATTRIBUTIONS) {
+        await prisma.attribution.upsert({
+          where: { slug: attr.slug },
+          update: {},
+          create: attr,
+        });
+      }
+    }
+
+    const attributions = await prisma.attribution.findMany({
+      orderBy: { createdAt: "asc" },
+      include: {
+        _count: {
+          select: { users: true },
+        },
+      },
+    });
+
+    return attributions.map((a) => ({
+      id: a.id,
+      name: a.name,
+      slug: a.slug,
+      description: a.description,
+      color: a.color,
+      permissions: a.permissions,
+      userCount: a._count.users,
+    }));
+  } catch (error) {
+    console.error("[getLabAttributions Error]:", error);
+    return [];
+  }
+}
+
+/**
+ * Cria uma nova atribuição customizada
+ */
+export async function createLabAttribution(data: {
+  name: string;
+  description?: string;
+  color?: string;
+  permissions: string[];
+}) {
+  const user = await getAuthenticatedUser();
+  if (!user) throw new Error("Não autenticado. Por favor, faça login.");
+  if (user.role !== "PROFESSOR") {
+    throw new Error("Acesso negado: apenas Professores podem criar novas atribuições.");
+  }
+
+  const slug = data.name
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+
+  try {
+    const attribution = await prisma.attribution.create({
+      data: {
+        name: data.name.trim(),
+        slug: slug || `attr-${Date.now()}`,
+        description: data.description?.trim() || null,
+        color: data.color || "#0E4734",
+        permissions: data.permissions || [],
+      },
+    });
+
+    revalidatePath("/members");
+    return { success: true, attribution };
+  } catch (error) {
+    console.error("[createLabAttribution Error]:", error);
+    throw new Error("Erro ao criar a atribuição. Verifique se o nome já existe.");
+  }
+}
+
+/**
+ * Atualiza uma atribuição existente
+ */
+export async function updateLabAttribution(data: {
+  id: string;
+  name: string;
+  description?: string;
+  color?: string;
+  permissions: string[];
+}) {
+  const user = await getAuthenticatedUser();
+  if (!user) throw new Error("Não autenticado. Por favor, faça login.");
+  if (user.role !== "PROFESSOR") {
+    throw new Error("Acesso negado: apenas Professores podem editar atribuições.");
+  }
+
+  const slug = data.name
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+
+  try {
+    const updated = await prisma.attribution.update({
+      where: { id: data.id },
+      data: {
+        name: data.name.trim(),
+        slug: slug || `attr-${Date.now()}`,
+        description: data.description?.trim() || null,
+        color: data.color || "#0E4734",
+        permissions: data.permissions || [],
+      },
+    });
+
+    revalidatePath("/members");
+    return { success: true, attribution: updated };
+  } catch (error) {
+    console.error("[updateLabAttribution Error]:", error);
+    throw new Error("Erro ao atualizar atribuição.");
+  }
+}
+
+/**
+ * Remove uma atribuição do sistema
+ */
+export async function deleteLabAttribution(id: string) {
+  const user = await getAuthenticatedUser();
+  if (!user) throw new Error("Não autenticado. Por favor, faça login.");
+  if (user.role !== "PROFESSOR") {
+    throw new Error("Acesso negado: apenas Professores podem excluir atribuições.");
+  }
+
+  try {
+    await prisma.attribution.delete({
+      where: { id },
+    });
+
+    revalidatePath("/members");
+    return { success: true };
+  } catch (error) {
+    console.error("[deleteLabAttribution Error]:", error);
+    throw new Error("Erro ao excluir atribuição.");
+  }
+}
+
+/**
+ * Lista todos os integrantes do laboratório com dados consolidados
+ */
+export async function getLabMembers() {
+  try {
+    const users = await prisma.user.findMany({
+      orderBy: [
+        { role: "asc" },
+        { name: "asc" },
+      ],
+      include: {
+        attributions: {
+          include: {
+            attribution: true,
+          },
+        },
+        workspaceMemberships: {
+          include: {
+            workspace: {
+              select: { id: true, name: true, slug: true },
+            },
+          },
+        },
+        _count: {
+          select: {
+            timeEntries: true,
+            assignedTasks: true,
+          },
+        },
+      },
+    });
+
+    return users.map((u) => ({
+      id: u.id,
+      name: u.name,
+      email: u.email,
+      image: u.image,
+      role: u.role,
+      status: u.status,
+      academicId: u.academicId,
+      phone: u.phone,
+      course: u.course,
+      bio: u.bio,
+      createdAt: u.createdAt.toISOString(),
+      attributions: u.attributions.map((ua) => ({
+        id: ua.attribution.id,
+        name: ua.attribution.name,
+        slug: ua.attribution.slug,
+        color: ua.attribution.color,
+        permissions: ua.attribution.permissions,
+      })),
+      workspaceCount: u.workspaceMemberships.length,
+      workspaces: u.workspaceMemberships.map((wm) => wm.workspace),
+      timeEntriesCount: u._count.timeEntries,
+      tasksCount: u._count.assignedTasks,
+    }));
+  } catch (error) {
+    console.error("[getLabMembers Error]:", error);
+    return [];
+  }
+}
+
+/**
+ * Atualiza o papel, status e atribuições de um integrante
+ */
+export async function updateMemberRoleAndAttributions(data: {
+  userId: string;
+  role: "PROFESSOR" | "LEADER" | "STUDENT";
+  status: "ACTIVE" | "WAITING_APPROVAL" | "PENDING" | "REJECTED" | "SUSPENDED";
+  attributionIds: string[];
+}) {
+  const admin = await getAuthenticatedUser();
+  if (!admin) throw new Error("Não autenticado. Por favor, faça login.");
+  if (admin.role !== "PROFESSOR") {
+    throw new Error("Acesso negado: apenas Professores podem gerenciar papéis e atribuições de integrantes.");
+  }
+
+  try {
+    // 1. Atualiza papel e status do usuário
+    const updatedUser = await prisma.user.update({
+      where: { id: data.userId },
+      data: {
+        role: data.role,
+        status: data.status,
+        approvedById: admin.id,
+        approvedAt: data.status === "ACTIVE" ? new Date() : undefined,
+      },
+    });
+
+    // 2. Sincroniza atribuições
+    await prisma.userAttribution.deleteMany({
+      where: { userId: data.userId },
+    });
+
+    if (data.attributionIds && data.attributionIds.length > 0) {
+      await prisma.userAttribution.createMany({
+        data: data.attributionIds.map((attrId) => ({
+          userId: data.userId,
+          attributionId: attrId,
+        })),
+        skipDuplicates: true,
+      });
+    }
+
+    revalidatePath("/members");
+    revalidatePath("/");
+    revalidatePath("/admin/approvals");
+    return { success: true, user: updatedUser };
+  } catch (error) {
+    console.error("[updateMemberRoleAndAttributions Error]:", error);
+    throw new Error("Erro ao atualizar o integrante.");
+  }
+}
+
 

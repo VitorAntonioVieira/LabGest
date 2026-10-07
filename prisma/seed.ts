@@ -7,6 +7,8 @@ async function main() {
 
   // 1. ELIMINAR TODOS OS APONTAMENTOS DE HORAS ANTERIORES E DADOS MOCKADOS
   console.log("Limpando apontamentos de horas anteriores e dados antigos...");
+  await prisma.userAttribution.deleteMany({});
+  await prisma.attribution.deleteMany({});
   await prisma.timeEntry.deleteMany({});
   await prisma.taskTag.deleteMany({});
   await prisma.taskComment.deleteMany({});
@@ -60,6 +62,88 @@ async function main() {
     },
   });
 
+  // 2.1 ATRIBUIÇÕES DO LABORATÓRIO (RBAC DINÂMICO & MULTI-ATRIBUIÇÕES)
+  console.log("Criando atribuições padrão do laboratório...");
+  const attrGestao = await prisma.attribution.upsert({
+    where: { slug: "coordenacao-gestao" },
+    update: {},
+    create: {
+      name: "Coordenação & Gestão",
+      slug: "coordenacao-gestao",
+      description: "Coordenação institucional, gestão de pessoas, aprovação de projetos e alocação de recursos.",
+      color: "#24576C",
+      permissions: [
+        "workspaces",
+        "workspaces_admin",
+        "time_tracking",
+        "docs",
+        "calendar",
+        "members_view",
+        "members_manage",
+        "approvals",
+        "platform_settings",
+        "reports",
+      ],
+    },
+  });
+
+  const attrPesquisa = await prisma.attribution.upsert({
+    where: { slug: "pesquisa-desenvolvimento" },
+    update: {},
+    create: {
+      name: "Pesquisa & Desenvolvimento",
+      slug: "pesquisa-desenvolvimento",
+      description: "Condução de investigações científicas, produção de artigos acadêmicos e relatórios técnicos.",
+      color: "#0E4330",
+      permissions: ["workspaces", "time_tracking", "docs", "calendar", "members_view"],
+    },
+  });
+
+  const attrTI = await prisma.attribution.upsert({
+    where: { slug: "infraestrutura-tecnologia" },
+    update: {},
+    create: {
+      name: "Infraestrutura & Tecnologia",
+      slug: "infraestrutura-tecnologia",
+      description: "Desenvolvimento do sistema, suporte a servidores, banco de dados e automação do laboratório.",
+      color: "#4F46E5",
+      permissions: [
+        "workspaces",
+        "workspaces_admin",
+        "time_tracking",
+        "docs",
+        "calendar",
+        "members_view",
+        "members_manage",
+        "platform_settings",
+      ],
+    },
+  });
+
+  const attrComms = await prisma.attribution.upsert({
+    where: { slug: "comunicacao-midia" },
+    update: {},
+    create: {
+      name: "Comunicação & Mídia",
+      slug: "comunicacao-midia",
+      description: "Divulgação científica, mídias sociais, design gráfico e comunicação institucional.",
+      color: "#D97706",
+      permissions: ["workspaces", "time_tracking", "docs", "calendar", "members_view"],
+    },
+  });
+
+  const attrAdmin = await prisma.attribution.upsert({
+    where: { slug: "administrativo-financeiro" },
+    update: {},
+    create: {
+      name: "Administrativo & Financeiro",
+      slug: "administrativo-financeiro",
+      description: "Gestão documental, apoio a bolsas de pesquisa, prestação de contas e compras.",
+      color: "#059669",
+      permissions: ["workspaces", "time_tracking", "docs", "calendar", "members_view", "reports"],
+    },
+  });
+
   // 3. PROFESSOR REAL E USUÁRIOS REAIS
   // Professor Coordenador Oficial: Evandro Coggo
   const profEvandro = await prisma.user.upsert({
@@ -90,7 +174,7 @@ async function main() {
       role: "PROFESSOR",
       status: "ACTIVE",
       course: "Políticas Públicas & Tecnologia",
-      bio: "Pesquisador & Administrador de Sistemas - UNIFESP",
+      bio: "Coordenação de Sistemas & Tecnologia - UNIFESP",
     },
     create: {
       email: "vitor.silva@unifesp.br",
@@ -99,8 +183,19 @@ async function main() {
       status: "ACTIVE",
       academicId: "PROF-VITOR",
       course: "Políticas Públicas & Tecnologia",
-      bio: "Pesquisador & Administrador de Sistemas - UNIFESP",
+      bio: "Coordenação de Sistemas & Tecnologia - UNIFESP",
     },
+  });
+
+  // Vincula Atribuições aos Coordenadores
+  await prisma.userAttribution.createMany({
+    data: [
+      { userId: profEvandro.id, attributionId: attrGestao.id },
+      { userId: profEvandro.id, attributionId: attrPesquisa.id },
+      { userId: userVitor.id, attributionId: attrGestao.id },
+      { userId: userVitor.id, attributionId: attrTI.id },
+    ],
+    skipDuplicates: true,
   });
 
   // =========================================================================

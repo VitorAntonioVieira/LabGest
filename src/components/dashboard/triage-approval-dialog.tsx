@@ -127,7 +127,7 @@ export function TriageApprovalDialog({
           <div className="rounded-lg border border-border/80 bg-muted/30 p-3.5 space-y-2.5">
             <div className="flex items-center justify-between">
               <span className="font-bold text-foreground text-sm">
-                {user.name || "Pesquisador"}
+                {user.name || "Integrante"}
               </span>
               <Badge variant="outline" className="text-[10px]">
                 {new Date(user.createdAt).toLocaleDateString("pt-BR")}
@@ -169,7 +169,7 @@ export function TriageApprovalDialog({
                 }`}
               >
                 <div className="flex items-center justify-between mb-1">
-                  <span className="font-bold text-xs text-foreground">Pesquisador (Aluno)</span>
+                  <span className="font-bold text-xs text-foreground">Integrante</span>
                   <input
                     type="radio"
                     name="role"
@@ -191,7 +191,7 @@ export function TriageApprovalDialog({
                 }`}
               >
                 <div className="flex items-center justify-between mb-1">
-                  <span className="font-bold text-xs text-foreground">Líder de Pesquisa</span>
+                  <span className="font-bold text-xs text-foreground">Líder (Gestão)</span>
                   <input
                     type="radio"
                     name="role"
@@ -201,7 +201,7 @@ export function TriageApprovalDialog({
                   />
                 </div>
                 <span className="text-[10px] text-muted-foreground">
-                  Capacidade de criar colunas, gerenciar membros e homologar atividades.
+                  Capacidade de criar colunas, gerenciar membros e coordenar atividades.
                 </span>
               </label>
             </div>

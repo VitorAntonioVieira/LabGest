@@ -115,7 +115,7 @@ export function PendingApprovals({
                   Painel da Coordenação: Solicitações Pendentes de Homologação
                 </CardTitle>
                 <CardDescription className="text-xs text-amber-800/80 dark:text-amber-300/80">
-                  Realize a triagem de novos pesquisadores e aprove a abertura de braços de pesquisa.
+                  Realize a triagem de novos integrantes e aprove a abertura de braços de pesquisa.
                 </CardDescription>
               </div>
             </div>
@@ -137,7 +137,7 @@ export function PendingApprovals({
                 }`}
               >
                 <Users className="h-3.5 w-3.5" />
-                Novos Membros ({pendingUsers.length})
+                Novos Integrantes ({pendingUsers.length})
               </button>
             )}
 
@@ -176,7 +176,7 @@ export function PendingApprovals({
                   <div className="space-y-1">
                     <div className="flex items-center gap-2">
                       <span className="font-semibold text-sm text-foreground">
-                        {user.name || "Pesquisador UNIFESP"}
+                        {user.name || "Integrante UNIFESP"}
                       </span>
                       <Badge variant="outline" className="text-[10px] font-mono">
                         {user.email}
@@ -246,7 +246,7 @@ export function PendingApprovals({
                       <p className="text-[11px] text-muted-foreground/80 pt-1">
                         Solicitado por:{" "}
                         <span className="font-medium text-foreground">
-                          {ws.requestedBy.name || ws.requestedBy.email || "Pesquisador"}
+                          {ws.requestedBy.name || ws.requestedBy.email || "Integrante"}
                         </span>{" "}
                         • {new Date(ws.createdAt).toLocaleDateString("pt-BR")}
                       </p>

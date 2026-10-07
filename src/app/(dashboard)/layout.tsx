@@ -37,7 +37,7 @@ export default async function DashboardLayout({
         currentUser={
           session?.user
             ? {
-                name: session.user.name || "Pesquisador UNIFESP",
+                name: session.user.name || "Integrante UNIFESP",
                 email: session.user.email || "",
                 role: session.user.role || "STUDENT",
                 avatarUrl: session.user.image || undefined,
