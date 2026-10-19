@@ -1,26 +1,25 @@
 import React from "react";
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import { BookOpen, Plus, FileText, Search, ChevronRight, FolderGit2 } from "lucide-react";
-import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
+import { getActiveLabContext } from "@/lib/lab-context";
+import { BookOpen, FileText, ChevronRight } from "lucide-react";
+import { Card, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { DocsHeaderActions } from "@/components/docs/docs-header-actions";
 
 export default async function DocsCentralPage() {
-  const session = await getServerSession(authOptions);
+  const { user, activeLab, activeLabId } = await getActiveLabContext();
 
-  if (!session?.user?.id) {
+  if (!user) {
     redirect("/login");
   }
 
-  const userId = session.user.id;
+  const userId = user.id;
 
   const documents = await prisma.document.findMany({
     where: {
+      labId: activeLabId,
       OR: [{ ownerId: userId }, { type: "WORKSPACE" }],
     },
     include: {
@@ -31,7 +30,7 @@ export default async function DocsCentralPage() {
   });
 
   const workspaces = await prisma.workspace.findMany({
-    where: { status: "APPROVED" },
+    where: { labId: activeLabId, status: "APPROVED" },
     select: { id: true, name: true },
     orderBy: { name: "asc" },
   });
@@ -43,7 +42,7 @@ export default async function DocsCentralPage() {
         <div>
           <div className="flex items-center gap-2 mb-1">
             <Badge variant="secondary" className="text-xs">
-              Notion-like Docs
+              {activeLab.name} • Notion-like Docs
             </Badge>
           </div>
           <h1 className="text-2xl font-bold tracking-tight text-foreground sm:text-3xl flex items-center gap-2.5">
@@ -51,7 +50,7 @@ export default async function DocsCentralPage() {
             Cadernos de Notas & Documentação Científica
           </h1>
           <p className="text-sm text-muted-foreground mt-1">
-            Repositório de protocolos, metodologias experimentais e anotações colaborativas do Living Lab.
+            Repositório de protocolos, metodologias experimentais e anotações colaborativas do <strong>{activeLab.name}</strong>.
           </p>
         </div>
 
@@ -62,7 +61,7 @@ export default async function DocsCentralPage() {
       {documents.length === 0 ? (
         <Card className="border-dashed p-12 text-center bg-card/40">
           <FileText className="mx-auto h-10 w-10 text-muted-foreground/50 mb-3" />
-          <CardTitle className="text-base font-semibold">Nenhuma nota ou documento cadastrado</CardTitle>
+          <CardTitle className="text-base font-semibold">Nenhuma nota ou documento cadastrado neste laboratório</CardTitle>
           <CardDescription className="text-xs max-w-sm mx-auto mt-1">
             Crie sua primeira página de anotações ou acesse um dos braços de pesquisa para documentar seus experimentos.
           </CardDescription>

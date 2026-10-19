@@ -1,8 +1,7 @@
 import React from "react";
 import { notFound, redirect } from "next/navigation";
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { getActiveLabContext } from "@/lib/lab-context";
 import { DocumentEditor } from "@/components/docs/document-editor";
 
 interface PersonalDocEditorPageProps {
@@ -14,8 +13,8 @@ interface PersonalDocEditorPageProps {
 export default async function PersonalDocEditorPage({
   params,
 }: PersonalDocEditorPageProps) {
-  const session = await getServerSession(authOptions);
-  if (!session?.user?.id) {
+  const { user, activeLabId, roleInLab } = await getActiveLabContext();
+  if (!user) {
     redirect("/login");
   }
 
@@ -35,15 +34,14 @@ export default async function PersonalDocEditorPage({
     notFound();
   }
 
-  // Se o documento pertencer a um workspace, redireciona para a rota contextualizada do workspace
   if (document.workspaceId) {
     redirect(`/workspace/${document.workspaceId}/docs/${document.id}`);
   }
 
-  // Para notas pessoais, busca irmãos do mesmo proprietário
   const siblingDocs = await prisma.document.findMany({
     where: {
-      ownerId: session.user.id,
+      labId: document.labId || activeLabId,
+      ownerId: user.id,
       type: "PERSONAL",
     },
     select: {
@@ -60,9 +58,9 @@ export default async function PersonalDocEditorPage({
       initialDocument={document}
       workspaceDocuments={siblingDocs}
       currentUser={{
-        id: session.user.id,
-        name: session.user.name || null,
-        role: (session.user as any).role,
+        id: user.id,
+        name: user.name || null,
+        role: roleInLab,
       }}
     />
   );

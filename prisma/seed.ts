@@ -38,9 +38,33 @@ async function main() {
     },
   });
 
-  // 2. CONFIGURAÇÕES WHITE-LABEL DA PLATAFORMA (LAB CTPP • UNIFESP)
+  // 2. LABORATÓRIO INAUGURAL (TENANT) E CONFIGURAÇÕES WHITE-LABEL (LAB CTPP • UNIFESP)
+  await prisma.laboratory.upsert({
+    where: { id: "lab-ctpp" },
+    update: {
+      name: "Lab CTPP",
+      institutionName: "UNIFESP",
+      departmentName: "Living Lab de Políticas Públicas & Tecnologia",
+      primaryColor: "#0E4330",
+      secondaryColor: "#24576C",
+      accentColor: "#1F8A64",
+      supportEmail: "evandro.coggo@unifesp.br",
+    },
+    create: {
+      id: "lab-ctpp",
+      name: "Lab CTPP",
+      slug: "lab-ctpp",
+      institutionName: "UNIFESP",
+      departmentName: "Living Lab de Políticas Públicas & Tecnologia",
+      primaryColor: "#0E4330",
+      secondaryColor: "#24576C",
+      accentColor: "#1F8A64",
+      supportEmail: "evandro.coggo@unifesp.br",
+    },
+  });
+
   await prisma.platformSettings.upsert({
-    where: { id: "default-settings" },
+    where: { labId: "lab-ctpp" },
     update: {
       labName: "Lab CTPP",
       institutionName: "UNIFESP",
@@ -52,6 +76,7 @@ async function main() {
     },
     create: {
       id: "default-settings",
+      labId: "lab-ctpp",
       labName: "Lab CTPP",
       institutionName: "UNIFESP",
       departmentName: "Living Lab de Políticas Públicas & Tecnologia",
@@ -65,9 +90,10 @@ async function main() {
   // 2.1 ATRIBUIÇÕES DO LABORATÓRIO (RBAC DINÂMICO & MULTI-ATRIBUIÇÕES)
   console.log("Criando atribuições padrão do laboratório...");
   const attrGestao = await prisma.attribution.upsert({
-    where: { slug: "coordenacao-gestao" },
+    where: { labId_slug: { labId: "lab-ctpp", slug: "coordenacao-gestao" } },
     update: {},
     create: {
+      labId: "lab-ctpp",
       name: "Coordenação & Gestão",
       slug: "coordenacao-gestao",
       description: "Coordenação institucional, gestão de pessoas, aprovação de projetos e alocação de recursos.",
@@ -88,9 +114,10 @@ async function main() {
   });
 
   const attrPesquisa = await prisma.attribution.upsert({
-    where: { slug: "pesquisa-desenvolvimento" },
+    where: { labId_slug: { labId: "lab-ctpp", slug: "pesquisa-desenvolvimento" } },
     update: {},
     create: {
+      labId: "lab-ctpp",
       name: "Pesquisa & Desenvolvimento",
       slug: "pesquisa-desenvolvimento",
       description: "Condução de investigações científicas, produção de artigos acadêmicos e relatórios técnicos.",
@@ -100,9 +127,10 @@ async function main() {
   });
 
   const attrTI = await prisma.attribution.upsert({
-    where: { slug: "infraestrutura-tecnologia" },
+    where: { labId_slug: { labId: "lab-ctpp", slug: "infraestrutura-tecnologia" } },
     update: {},
     create: {
+      labId: "lab-ctpp",
       name: "Infraestrutura & Tecnologia",
       slug: "infraestrutura-tecnologia",
       description: "Desenvolvimento do sistema, suporte a servidores, banco de dados e automação do laboratório.",
@@ -121,9 +149,10 @@ async function main() {
   });
 
   const attrComms = await prisma.attribution.upsert({
-    where: { slug: "comunicacao-midia" },
+    where: { labId_slug: { labId: "lab-ctpp", slug: "comunicacao-midia" } },
     update: {},
     create: {
+      labId: "lab-ctpp",
       name: "Comunicação & Mídia",
       slug: "comunicacao-midia",
       description: "Divulgação científica, mídias sociais, design gráfico e comunicação institucional.",
@@ -133,9 +162,10 @@ async function main() {
   });
 
   const attrAdmin = await prisma.attribution.upsert({
-    where: { slug: "administrativo-financeiro" },
+    where: { labId_slug: { labId: "lab-ctpp", slug: "administrativo-financeiro" } },
     update: {},
     create: {
+      labId: "lab-ctpp",
       name: "Administrativo & Financeiro",
       slug: "administrativo-financeiro",
       description: "Gestão documental, apoio a bolsas de pesquisa, prestação de contas e compras.",

@@ -1,24 +1,25 @@
 import React from "react";
 import { redirect } from "next/navigation";
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/auth";
+import { getActiveLabContext } from "@/lib/lab-context";
 import { getPlatformSettings } from "@/lib/settings";
-import { Sliders, Palette, ShieldCheck } from "lucide-react";
+import { Sliders } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { PlatformSettingsForm } from "@/components/admin/platform-settings-form";
 
-export default async function AdminSettingsPage() {
-  const session = await getServerSession(authOptions);
+export const dynamic = "force-dynamic";
 
-  if (!session?.user?.id) {
+export default async function AdminSettingsPage() {
+  const { user, activeLab, activeLabId, canManageLab } = await getActiveLabContext();
+
+  if (!user) {
     redirect("/login");
   }
 
-  if (session.user.role !== "PROFESSOR") {
+  if (!canManageLab) {
     redirect("/");
   }
 
-  const settings = await getPlatformSettings();
+  const settings = await getPlatformSettings(activeLabId);
 
   return (
     <div className="space-y-8">
@@ -26,15 +27,15 @@ export default async function AdminSettingsPage() {
       <div className="border-b border-border pb-6">
         <div className="flex items-center gap-2 mb-1">
           <Badge variant="lab" className="text-xs">
-            Coordenação Geral
+            {activeLab.name} • Coordenação Geral
           </Badge>
         </div>
         <h1 className="text-2xl font-bold tracking-tight text-foreground sm:text-3xl flex items-center gap-2.5">
           <Sliders className="h-7 w-7 text-primary" />
-          Configurações da Plataforma (White-label)
+          Configurações White-label ({activeLab.name})
         </h1>
         <p className="text-sm text-muted-foreground mt-1">
-          Personalize a identidade institucional, o nome do laboratório e a paleta de cores padrão de toda a aplicação.
+          Personalize a identidade institucional, o logotipo e a paleta de cores exclusivas do laboratório <strong>{activeLab.name}</strong>.
         </p>
       </div>
 

@@ -24,6 +24,7 @@ export async function middleware(req: NextRequest) {
   const isLoginPage = pathname === "/login";
   const isOnboardingPage = pathname === "/onboarding";
   const isWaitingRoomPage = pathname === "/waiting-room";
+  const isLabsPage = pathname === "/labs";
 
   // Se o usuário não está autenticado
   if (!isAuth) {
@@ -31,7 +32,7 @@ export async function middleware(req: NextRequest) {
       return NextResponse.next();
     }
     const loginUrl = new URL("/login", req.url);
-    loginUrl.searchParams.set("callbackUrl", pathname);
+    loginUrl.searchParams.set("callbackUrl", pathname === "/" ? "/labs" : pathname);
     return NextResponse.redirect(loginUrl);
   }
 
@@ -47,17 +48,19 @@ export async function middleware(req: NextRequest) {
     if (userStatus === "WAITING_APPROVAL") {
       return NextResponse.redirect(new URL("/waiting-room", req.url));
     }
-    return NextResponse.redirect(new URL("/", req.url));
+    // Caso já aprovado, após fazer login exibe quais laboratórios estão disponíveis para acesso (/labs)
+    return NextResponse.redirect(new URL("/labs", req.url));
   }
 
-  // Se o usuário foi rejeitado ou suspenso
+  // Se o usuário foi rejeitado ou suspenso em todos os laboratórios
   if (userStatus === "REJECTED" || userStatus === "SUSPENDED") {
-    const errorUrl = new URL("/login", req.url);
-    errorUrl.searchParams.set("error", "AccessDenied");
-    return NextResponse.redirect(errorUrl);
+    if (isOnboardingPage || isLabsPage) {
+      return NextResponse.next();
+    }
+    return NextResponse.redirect(new URL("/labs", req.url));
   }
 
-  // 1. Status PENDING: força redirecionamento para o formulário de Onboarding
+  // 1. Status PENDING: força redirecionamento para o formulário de Onboarding + Escolha do Laboratório
   if (userStatus === "PENDING") {
     if (!isOnboardingPage) {
       return NextResponse.redirect(new URL("/onboarding", req.url));
@@ -65,21 +68,31 @@ export async function middleware(req: NextRequest) {
     return NextResponse.next();
   }
 
-  // 2. Status WAITING_APPROVAL: força redirecionamento para a Sala de Espera
+  // 2. Status WAITING_APPROVAL (sem nenhum laboratório ACTIVE ainda): permite /waiting-room e /labs (para solicitar outro lab)
   if (userStatus === "WAITING_APPROVAL") {
-    if (!isWaitingRoomPage) {
+    if (!isWaitingRoomPage && !isLabsPage) {
       return NextResponse.redirect(new URL("/waiting-room", req.url));
     }
     return NextResponse.next();
   }
 
-  // 3. Status ACTIVE: não deve acessar telas transitórias de onboarding ou espera
+  // 3. Status ACTIVE: não precisa ficar preso em onboarding ou waiting-room
   if (userStatus === "ACTIVE" && (isOnboardingPage || isWaitingRoomPage)) {
+    return NextResponse.redirect(new URL("/labs", req.url));
+  }
+
+  // 4. Proteção de rotas administrativas do Laboratório:
+  // - /admin/approvals: acessível pelo Responsável do Lab (PROFESSOR) E pelos Líderes (LEADER)
+  if (
+    pathname.startsWith("/admin/approvals") &&
+    userRole !== "PROFESSOR" &&
+    userRole !== "LEADER"
+  ) {
     return NextResponse.redirect(new URL("/", req.url));
   }
 
-  // 4. Proteção de rotas da Coordenação Geral (/admin)
-  if (pathname.startsWith("/admin") && userRole !== "PROFESSOR") {
+  // - /admin/settings: restrito ao Responsável do Lab (PROFESSOR)
+  if (pathname.startsWith("/admin/settings") && userRole !== "PROFESSOR") {
     return NextResponse.redirect(new URL("/", req.url));
   }
 
@@ -87,7 +100,5 @@ export async function middleware(req: NextRequest) {
 }
 
 export const config = {
-  matcher: [
-    "/((?!api/auth|_next/static|_next/image|favicon.ico).*)",
-  ],
+  matcher: ["/((?!api/auth|_next/static|_next/image|favicon.ico).*)"],
 };
