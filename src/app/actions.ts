@@ -1,10 +1,14 @@
 "use server";
 
-import { getServerSession } from "next-auth";
+import { cookies } from "next/headers";
 import { revalidatePath } from "next/cache";
-import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import { isEmailAllowed } from "@/lib/auth-utils";
+import {
+  ACTIVE_LAB_COOKIE,
+  DEFAULT_LAB_ID,
+  getActiveLabContext,
+} from "@/lib/lab-context";
+import type { UserRole, UserStatus } from "@/types";
 
 /**
  * Helper central de autenticação e resiliência de sessão
@@ -12,40 +16,273 @@ import { isEmailAllowed } from "@/lib/auth-utils";
  * sessões legadas (cookies de bancos anteriores) e auto-provisionando usuários institucionais.
  */
 export async function getAuthenticatedUser() {
-  const session = await getServerSession(authOptions);
-  if (!session?.user) return null;
+  const { user } = await getActiveLabContext();
+  return user;
+}
 
-  // 1. Tenta buscar pelo ID registrado na sessão
-  let user = session.user.id
-    ? await prisma.user.findUnique({ where: { id: session.user.id } })
-    : null;
+// ==========================================
+// AÇÕES MULTI-TENANT DE LABORATÓRIOS (/labs)
+// ==========================================
 
-  // 2. Se não encontrar (token de banco anterior ou ID órfão), busca pelo e-mail
-  if (!user && session.user.email) {
-    user = await prisma.user.findUnique({ where: { email: session.user.email } });
+/**
+ * Seleciona o laboratório ativo na sessão atual (via Cookie HttpOnly/Lax)
+ * permitindo trocar de laboratório em um único endpoint com White-label dinâmico.
+ */
+export async function selectActiveLaboratory(labId: string) {
+  const { user } = await getActiveLabContext();
+  if (!user) {
+    throw new Error("Não autenticado. Por favor, faça login.");
   }
 
-  // 3. Se ainda não existir no banco mas possui e-mail institucional válido, auto-provisiona no PostgreSQL
-  if (!user && session.user.email && isEmailAllowed(session.user.email)) {
-    const email = session.user.email.toLowerCase();
-    const isCoordinator =
-      email === "evandro.coggo@unifesp.br" ||
-      email.startsWith("evandro.") ||
-      email === "vitor.antonio@unifesp.br" ||
-      email === "vitor.silva@unifesp.br";
+  const lab = await prisma.laboratory.findUnique({
+    where: { id: labId },
+  });
 
-    user = await prisma.user.create({
+  if (!lab || !lab.isActive) {
+    throw new Error("Laboratório não encontrado ou inativo.");
+  }
+
+  const membership = await prisma.labMembership.findUnique({
+    where: {
+      labId_userId: {
+        labId,
+        userId: user.id,
+      },
+    },
+  });
+
+  // Se o usuário é Coordenador Geral (PROFESSOR) e ainda não tinha registro explícito no lab, cria como ACTIVE
+  if (!membership && user.role === "PROFESSOR") {
+    await prisma.labMembership.create({
       data: {
-        email,
-        name: session.user.name || "Integrante UNIFESP",
-        image: session.user.image,
-        role: isCoordinator ? "PROFESSOR" : "STUDENT",
-        status: isCoordinator ? "ACTIVE" : "PENDING",
+        labId,
+        userId: user.id,
+        role: "PROFESSOR",
+        status: "ACTIVE",
+        approvedById: user.id,
+        approvedAt: new Date(),
+      },
+    });
+  } else if (!membership || membership.status !== "ACTIVE") {
+    throw new Error("Você ainda não possui acesso homologado para este laboratório.");
+  }
+
+  cookies().set(ACTIVE_LAB_COOKIE, labId, {
+    path: "/",
+    maxAge: 60 * 60 * 24 * 30, // 30 dias
+    sameSite: "lax",
+  });
+
+  revalidatePath("/", "layout");
+  revalidatePath("/labs");
+  return { success: true, labId };
+}
+
+/**
+ * Solicita triagem para ingressar em um laboratório específico.
+ * O pedido fica em WAITING_APPROVAL para o Responsável do Lab (PROFESSOR) e Líderes (LEADER) aprovarem.
+ */
+export async function requestLabTriage(labId: string) {
+  const { user } = await getActiveLabContext();
+  if (!user) {
+    throw new Error("Não autenticado. Por favor, faça login.");
+  }
+
+  const lab = await prisma.laboratory.findUnique({
+    where: { id: labId },
+  });
+
+  if (!lab || !lab.isActive) {
+    throw new Error("Laboratório selecionado não está disponível.");
+  }
+
+  const existing = await prisma.labMembership.findUnique({
+    where: {
+      labId_userId: {
+        labId,
+        userId: user.id,
+      },
+    },
+  });
+
+  if (existing && existing.status === "ACTIVE") {
+    return { success: true, membership: existing, alreadyActive: true };
+  }
+
+  const isProfessor = user.role === "PROFESSOR";
+
+  const membership = await prisma.labMembership.upsert({
+    where: {
+      labId_userId: {
+        labId,
+        userId: user.id,
+      },
+    },
+    update: {
+      status: isProfessor ? "ACTIVE" : "WAITING_APPROVAL",
+      role: isProfessor ? "PROFESSOR" : existing?.role || "STUDENT",
+    },
+    create: {
+      labId,
+      userId: user.id,
+      role: isProfessor ? "PROFESSOR" : "STUDENT",
+      status: isProfessor ? "ACTIVE" : "WAITING_APPROVAL",
+      approvedAt: isProfessor ? new Date() : null,
+    },
+  });
+
+  // Se o usuário ainda estava PENDING ou REJECTED globalmente, atualiza para WAITING_APPROVAL (ou ACTIVE)
+  if (user.status === "PENDING" || user.status === "REJECTED") {
+    await prisma.user.update({
+      where: { id: user.id },
+      data: {
+        status: isProfessor ? "ACTIVE" : "WAITING_APPROVAL",
       },
     });
   }
 
-  return user;
+  revalidatePath("/labs");
+  revalidatePath("/waiting-room");
+  revalidatePath("/admin/approvals");
+  revalidatePath("/");
+  return { success: true, membership };
+}
+
+export interface CreateLaboratoryInput {
+  name: string;
+  departmentName?: string;
+  institutionName?: string;
+  description?: string;
+  primaryColor?: string;
+  secondaryColor?: string;
+  accentColor?: string;
+  supportEmail?: string;
+  logoUrl?: string;
+}
+
+/**
+ * Cria um novo Laboratório (Tenant) na plataforma com identidade White-label própria
+ * e define o usuário criador como Responsável pelo Laboratório.
+ */
+export async function createLaboratory(data: CreateLaboratoryInput) {
+  const { user } = await getActiveLabContext();
+  if (!user) {
+    throw new Error("Não autenticado. Por favor, faça login.");
+  }
+
+  if (user.role !== "PROFESSOR") {
+    throw new Error("Apenas Professores / Coordenadores podem cadastrar um novo laboratório na plataforma.");
+  }
+
+  if (!data.name || data.name.trim() === "") {
+    throw new Error("O nome do laboratório é obrigatório.");
+  }
+
+  const baseSlug = data.name
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/(^-|-$)+/g, "");
+
+  const existingSlug = await prisma.laboratory.findUnique({
+    where: { slug: baseSlug },
+  });
+
+  const slug = existingSlug
+    ? `${baseSlug}-${Math.random().toString(36).substring(2, 6)}`
+    : baseSlug;
+
+  const primaryColor = data.primaryColor || "#0E4330";
+  const secondaryColor = data.secondaryColor || "#24576C";
+  const accentColor = data.accentColor || "#1F8A64";
+  const institutionName = data.institutionName?.trim() || "UNIFESP";
+  const departmentName = data.departmentName?.trim() || "Laboratório de Pesquisa";
+  const supportEmail = data.supportEmail?.trim() || user.email || "contato@unifesp.br";
+
+  try {
+    const newLab = await prisma.laboratory.create({
+      data: {
+        name: data.name.trim(),
+        slug,
+        description: data.description?.trim() || null,
+        institutionName,
+        departmentName,
+        primaryColor,
+        secondaryColor,
+        accentColor,
+        logoUrl: data.logoUrl?.trim() || null,
+        supportEmail,
+        responsibleId: user.id,
+        isActive: true,
+        platformSettings: {
+          create: {
+            labName: data.name.trim(),
+            institutionName,
+            departmentName,
+            primaryColor,
+            secondaryColor,
+            accentColor,
+            logoUrl: data.logoUrl?.trim() || null,
+            supportEmail,
+          },
+        },
+        memberships: {
+          create: {
+            userId: user.id,
+            role: "PROFESSOR",
+            status: "ACTIVE",
+            approvedById: user.id,
+            approvedAt: new Date(),
+          },
+        },
+      },
+    });
+
+    // Cria um workspace inicial padrão para o novo laboratório
+    const initialWs = await prisma.workspace.create({
+      data: {
+        labId: newLab.id,
+        name: `Pesquisa Geral • ${newLab.name}`,
+        slug: `pesquisa-geral-${slug}`,
+        department: departmentName,
+        description: `Espaço principal de gestão de atividades e projetos do ${newLab.name}.`,
+        status: "APPROVED",
+        requestedById: user.id,
+        approvedById: user.id,
+        approvedAt: new Date(),
+        members: {
+          create: {
+            userId: user.id,
+            role: "OWNER",
+          },
+        },
+      },
+    });
+
+    await prisma.kanbanColumn.createMany({
+      data: [
+        { labId: newLab.id, workspaceId: initialWs.id, title: "A Fazer", order: 0 },
+        { labId: newLab.id, workspaceId: initialWs.id, title: "Em Andamento", order: 1 },
+        { labId: newLab.id, workspaceId: initialWs.id, title: "Revisão", order: 2 },
+        { labId: newLab.id, workspaceId: initialWs.id, title: "Concluído", order: 3 },
+      ],
+    });
+
+    // Ativa automaticamente o laboratório recém-criado
+    cookies().set(ACTIVE_LAB_COOKIE, newLab.id, {
+      path: "/",
+      maxAge: 60 * 60 * 24 * 30,
+      sameSite: "lax",
+    });
+
+    revalidatePath("/", "layout");
+    revalidatePath("/labs");
+    return { success: true, laboratory: newLab };
+  } catch (error) {
+    console.error("[createLaboratory Error]:", error);
+    throw new Error("Erro ao criar novo laboratório.");
+  }
 }
 
 export interface TimeEntryInput {
@@ -58,23 +295,22 @@ export interface TimeEntryInput {
 }
 
 /**
- * Server Action: Aprovar Workspace (Restrito ao PROFESSOR)
+ * Server Action: Aprovar Workspace (Permitido ao Responsável do Lab PROFESSOR e Líderes LEADER)
  */
 export async function approveWorkspace(workspaceId: string) {
-  const user = await getAuthenticatedUser();
+  const { user, activeLabId, canApproveInLab } = await getActiveLabContext();
 
   if (!user) {
     throw new Error("Não autenticado. Por favor, faça login.");
   }
 
-  // Validação estrita de RBAC
-  if (user.role !== "PROFESSOR") {
-    throw new Error("Acesso negado: apenas Professores podem aprovar novos espaços de trabalho.");
+  if (!canApproveInLab) {
+    throw new Error("Acesso negado: apenas o Responsável do Laboratório e os Líderes podem aprovar espaços de trabalho.");
   }
 
   try {
     const updated = await prisma.workspace.update({
-      where: { id: workspaceId },
+      where: { id: workspaceId, labId: activeLabId },
       data: {
         status: "APPROVED",
         approvedById: user.id,
@@ -84,6 +320,7 @@ export async function approveWorkspace(workspaceId: string) {
 
     revalidatePath("/");
     revalidatePath("/workspaces");
+    revalidatePath("/admin/approvals");
     return { success: true, workspace: updated };
   } catch (error) {
     console.error("[approveWorkspace Error]:", error);
@@ -92,22 +329,22 @@ export async function approveWorkspace(workspaceId: string) {
 }
 
 /**
- * Server Action: Recusar Workspace com justificativa (Restrito ao PROFESSOR)
+ * Server Action: Recusar Workspace com justificativa (Permitido ao Responsável do Lab PROFESSOR e Líderes LEADER)
  */
 export async function rejectWorkspace(workspaceId: string, rejectionNotes?: string) {
-  const user = await getAuthenticatedUser();
+  const { user, activeLabId, canApproveInLab } = await getActiveLabContext();
 
   if (!user) {
     throw new Error("Não autenticado. Por favor, faça login.");
   }
 
-  if (user.role !== "PROFESSOR") {
-    throw new Error("Acesso negado: apenas Professores podem avaliar espaços de trabalho.");
+  if (!canApproveInLab) {
+    throw new Error("Acesso negado: apenas o Responsável do Laboratório e os Líderes podem avaliar espaços de trabalho.");
   }
 
   try {
     const updated = await prisma.workspace.update({
-      where: { id: workspaceId },
+      where: { id: workspaceId, labId: activeLabId },
       data: {
         status: "REJECTED",
         rejectionNotes: rejectionNotes || "Solicitação não atende aos requisitos do laboratório.",
@@ -117,6 +354,7 @@ export async function rejectWorkspace(workspaceId: string, rejectionNotes?: stri
 
     revalidatePath("/");
     revalidatePath("/workspaces");
+    revalidatePath("/admin/approvals");
     return { success: true, workspace: updated };
   } catch (error) {
     console.error("[rejectWorkspace Error]:", error);
@@ -125,10 +363,10 @@ export async function rejectWorkspace(workspaceId: string, rejectionNotes?: stri
 }
 
 /**
- * Server Action: Criar Apontamento de Horas (Time Entry)
+ * Server Action: Criar Apontamento de Horas (Time Entry) no Laboratório Ativo
  */
 export async function createTimeEntry(data: TimeEntryInput) {
-  const user = await getAuthenticatedUser();
+  const { user, activeLab, activeLabId } = await getActiveLabContext();
 
   if (!user) {
     throw new Error("Usuário não autenticado. Por favor, faça login.");
@@ -145,39 +383,42 @@ export async function createTimeEntry(data: TimeEntryInput) {
   try {
     let resolvedTaskId = data.taskId;
     let resolvedWorkspaceId = data.workspaceId;
+    let resolvedLabId = activeLabId;
 
-    // Se o usuário selecionou uma tarefa existente, busca o workspace vinculado
+    // Se o usuário selecionou uma tarefa existente, busca o workspace e labId vinculados
     if (resolvedTaskId) {
       const existingTask = await prisma.task.findUnique({
         where: { id: resolvedTaskId },
-        select: { workspaceId: true },
+        select: { workspaceId: true, labId: true },
       });
       if (existingTask) {
         resolvedWorkspaceId = existingTask.workspaceId;
+        resolvedLabId = existingTask.labId;
       }
     }
 
-    // Se não há tarefa ou workspace explícito, vincula a um workspace ativo ou cria uma atividade geral
+    // Se não há tarefa ou workspace explícito, vincula a um workspace ativo do laboratório atual
     if (!resolvedTaskId || !resolvedWorkspaceId) {
       let targetWorkspace = await prisma.workspace.findFirst({
-        where: { status: "APPROVED" },
+        where: { labId: activeLabId, status: "APPROVED" },
         include: { columns: { take: 1, orderBy: { order: "asc" } } },
       });
 
-      // Se não houver nenhum workspace ainda, cria um padrão
+      // Se não houver nenhum workspace ainda no laboratório ativo, cria um padrão
       if (!targetWorkspace) {
         targetWorkspace = await prisma.workspace.create({
           data: {
-            name: "Pesquisa Geral Living Lab",
-            slug: "pesquisa-geral",
-            department: "Living Lab CTPP",
+            labId: activeLabId,
+            name: `Pesquisa Geral ${activeLab.name}`,
+            slug: `pesquisa-geral-${activeLab.slug}-${Date.now().toString(36)}`,
+            department: activeLab.departmentName,
             status: "APPROVED",
             requestedById: user.id,
             columns: {
               create: [
-                { title: "A Fazer", order: 0 },
-                { title: "Em Andamento", order: 1 },
-                { title: "Concluído", order: 2 },
+                { labId: activeLabId, title: "A Fazer", order: 0 },
+                { labId: activeLabId, title: "Em Andamento", order: 1 },
+                { labId: activeLabId, title: "Concluído", order: 2 },
               ],
             },
           },
@@ -191,6 +432,7 @@ export async function createTimeEntry(data: TimeEntryInput) {
       const defaultColumn = targetWorkspace.columns[0];
       const newTask = await prisma.task.create({
         data: {
+          labId: activeLabId,
           title: data.taskTitle?.trim() || "Atividade de Pesquisa",
           workspaceId: targetWorkspace.id,
           columnId: defaultColumn.id,
@@ -206,9 +448,10 @@ export async function createTimeEntry(data: TimeEntryInput) {
       resolvedTaskId = newTask.id;
     }
 
-    // Cria o registro de horas
+    // Cria o registro de horas vinculado ao laboratório
     const newEntry = await prisma.timeEntry.create({
       data: {
+        labId: resolvedLabId,
         userId: user.id,
         taskId: resolvedTaskId,
         workspaceId: resolvedWorkspaceId,
@@ -232,14 +475,17 @@ export interface OnboardingInput {
   academicId: string;
   phone: string;
   course?: string;
+  labIds?: string[];
+  labId?: string;
 }
 
 /**
  * Server Action: Concluir Cadastro Inicial (Onboarding do Aluno/Pesquisador)
- * Transaciona o usuário de PENDING para WAITING_APPROVAL
+ * Salva dados acadêmicos e cria o pedido de triagem (LabMembership WAITING_APPROVAL)
+ * para o(s) laboratório(s) escolhido(s) pelo usuário.
  */
 export async function completeOnboarding(data: OnboardingInput) {
-  const user = await getAuthenticatedUser();
+  const { user } = await getActiveLabContext();
 
   if (!user) {
     throw new Error("Não autenticado. Por favor, faça login.");
@@ -253,24 +499,67 @@ export async function completeOnboarding(data: OnboardingInput) {
     throw new Error("O número de WhatsApp / Telefone é obrigatório.");
   }
 
+  const targetLabIds =
+    data.labIds && data.labIds.length > 0
+      ? data.labIds
+      : data.labId
+      ? [data.labId]
+      : [DEFAULT_LAB_ID];
+
   try {
+    const isProfessor = user.role === "PROFESSOR";
+    const nextStatus: UserStatus = isProfessor ? "ACTIVE" : "WAITING_APPROVAL";
+
     const updated = await prisma.user.update({
       where: { id: user.id },
       data: {
         academicId: data.academicId.trim(),
         phone: data.phone.trim(),
         course: data.course?.trim() || null,
-        status: "WAITING_APPROVAL",
+        status: nextStatus,
       },
     });
 
+    // Cria a solicitação de triagem para cada laboratório escolhido pelo usuário
+    for (const labId of targetLabIds) {
+      await prisma.labMembership.upsert({
+        where: {
+          labId_userId: {
+            labId,
+            userId: user.id,
+          },
+        },
+        update: {
+          status: nextStatus,
+        },
+        create: {
+          labId,
+          userId: user.id,
+          role: isProfessor ? "PROFESSOR" : "STUDENT",
+          status: nextStatus,
+          approvedAt: isProfessor ? new Date() : null,
+        },
+      });
+    }
+
+    // Define o primeiro laboratório selecionado como contexto inicial
+    if (targetLabIds[0]) {
+      cookies().set(ACTIVE_LAB_COOKIE, targetLabIds[0], {
+        path: "/",
+        maxAge: 60 * 60 * 24 * 30,
+        sameSite: "lax",
+      });
+    }
+
     revalidatePath("/");
+    revalidatePath("/labs");
     revalidatePath("/onboarding");
     revalidatePath("/waiting-room");
+    revalidatePath("/admin/approvals");
     return { success: true, user: updated };
   } catch (error) {
     console.error("[completeOnboarding Error]:", error);
-    throw new Error("Falha ao salvar dados de integração.");
+    throw new Error("Falha ao salvar dados de integração e enviar triagem ao laboratório.");
   }
 }
 
@@ -278,27 +567,46 @@ export interface TriageInput {
   userId: string;
   role: "STUDENT" | "LEADER";
   workspaceIds: string[];
+  labId?: string;
 }
 
 /**
- * Server Action: Triagem e Aprovação de Usuário (Restrito à Coordenação Geral)
- * Atribui a Role final, homologa status para ACTIVE e associa aos braços do lab
+ * Server Action: Triagem e Aprovação de Usuário no Laboratório
+ * Pode ser realizada pelo Responsável do Laboratório (PROFESSOR) E pelos Líderes (LEADER) do laboratório!
  */
 export async function triageAndApproveUser(data: TriageInput) {
-  const user = await getAuthenticatedUser();
+  const { user, activeLabId, canApproveInLab } = await getActiveLabContext();
 
   if (!user) {
     throw new Error("Não autenticado. Por favor, faça login.");
   }
 
-  if (user.role !== "PROFESSOR") {
-    throw new Error("Acesso negado: apenas a Coordenação Geral pode homologar membros.");
+  if (!canApproveInLab) {
+    throw new Error(
+      "Acesso negado: apenas o Responsável do Laboratório e os Líderes podem aprovar pedidos de triagem."
+    );
   }
 
+  const targetLabId = data.labId || activeLabId;
+
   try {
-    const updatedUser = await prisma.user.update({
-      where: { id: data.userId },
-      data: {
+    // 1. Homologa o vínculo do usuário naquele laboratório específico (LabMembership)
+    await prisma.labMembership.upsert({
+      where: {
+        labId_userId: {
+          labId: targetLabId,
+          userId: data.userId,
+        },
+      },
+      update: {
+        role: data.role,
+        status: "ACTIVE",
+        approvedById: user.id,
+        approvedAt: new Date(),
+      },
+      create: {
+        labId: targetLabId,
+        userId: data.userId,
         role: data.role,
         status: "ACTIVE",
         approvedById: user.id,
@@ -306,7 +614,26 @@ export async function triageAndApproveUser(data: TriageInput) {
       },
     });
 
-    // Vincula o usuário aos braços de pesquisa selecionados
+    // 2. Atualiza também o status global do User para ACTIVE (permitindo login na plataforma)
+    const targetUser = await prisma.user.findUnique({ where: { id: data.userId } });
+    const updatedGlobalRole: UserRole =
+      targetUser?.role === "PROFESSOR"
+        ? "PROFESSOR"
+        : data.role === "LEADER"
+        ? "LEADER"
+        : targetUser?.role || "STUDENT";
+
+    const updatedUser = await prisma.user.update({
+      where: { id: data.userId },
+      data: {
+        role: updatedGlobalRole,
+        status: "ACTIVE",
+        approvedById: user.id,
+        approvedAt: new Date(),
+      },
+    });
+
+    // 3. Vincula o usuário aos braços de pesquisa (Workspaces) selecionados daquele laboratório
     if (data.workspaceIds && data.workspaceIds.length > 0) {
       for (const wsId of data.workspaceIds) {
         await prisma.workspaceMember.upsert({
@@ -329,45 +656,84 @@ export async function triageAndApproveUser(data: TriageInput) {
     }
 
     revalidatePath("/");
+    revalidatePath("/labs");
     revalidatePath("/workspaces");
+    revalidatePath("/members");
     revalidatePath("/admin/approvals");
     return { success: true, user: updatedUser };
   } catch (error) {
     console.error("[triageAndApproveUser Error]:", error);
-    throw new Error("Erro ao realizar a triagem do membro.");
+    throw new Error("Erro ao realizar a triagem do membro no laboratório.");
   }
 }
 
 /**
- * Server Action: Recusar solicitação de ingresso do membro
+ * Server Action: Recusar solicitação de ingresso do membro no laboratório ativo
+ * Permitido ao Responsável do Lab (PROFESSOR) e aos Líderes (LEADER) do laboratório.
  */
-export async function rejectPendingUser(userId: string) {
-  const user = await getAuthenticatedUser();
+export async function rejectPendingUser(userId: string, labId?: string) {
+  const { user, activeLabId, canApproveInLab } = await getActiveLabContext();
 
   if (!user) {
     throw new Error("Não autenticado. Por favor, faça login.");
   }
 
-  if (user.role !== "PROFESSOR") {
-    throw new Error("Acesso negado.");
+  if (!canApproveInLab) {
+    throw new Error("Acesso negado: apenas o Responsável e os Líderes do laboratório podem recusar solicitações.");
   }
 
+  const targetLabId = labId || activeLabId;
+
   try {
-    const updated = await prisma.user.update({
-      where: { id: userId },
-      data: {
+    await prisma.labMembership.upsert({
+      where: {
+        labId_userId: {
+          labId: targetLabId,
+          userId,
+        },
+      },
+      update: {
+        status: "REJECTED",
+        approvedById: user.id,
+        approvedAt: new Date(),
+      },
+      create: {
+        labId: targetLabId,
+        userId,
         status: "REJECTED",
         approvedById: user.id,
         approvedAt: new Date(),
       },
     });
 
+    // Verifica se o usuário possui algum outro laboratório ACTIVE ou WAITING_APPROVAL
+    const remainingMemberships = await prisma.labMembership.findMany({
+      where: { userId },
+    });
+
+    const hasOtherActive = remainingMemberships.some((m) => m.status === "ACTIVE");
+    const hasOtherWaiting = remainingMemberships.some((m) => m.status === "WAITING_APPROVAL");
+
+    const updated = await prisma.user.update({
+      where: { id: userId },
+      data: {
+        status: hasOtherActive
+          ? "ACTIVE"
+          : hasOtherWaiting
+          ? "WAITING_APPROVAL"
+          : "REJECTED",
+        approvedById: user.id,
+        approvedAt: new Date(),
+      },
+    });
+
     revalidatePath("/");
+    revalidatePath("/labs");
     revalidatePath("/admin/approvals");
     return { success: true, user: updated };
   } catch (error) {
     console.error("[rejectPendingUser Error]:", error);
-    throw new Error("Erro ao recusar usuário.");
+    throw new Error("Erro ao recusar usuário no laboratório.");
   }
 }
 
@@ -378,10 +744,10 @@ export interface RequestWorkspaceInput {
 }
 
 /**
- * Server Action: Solicitar Abertura de Novo Braço de Pesquisa (Workspace)
+ * Server Action: Solicitar Abertura de Novo Braço de Pesquisa (Workspace) no Laboratório Ativo
  */
 export async function requestWorkspace(data: RequestWorkspaceInput) {
-  const user = await getAuthenticatedUser();
+  const { user, activeLab, activeLabId, canApproveInLab } = await getActiveLabContext();
 
   if (!user) {
     throw new Error("Não autenticado. Por favor, faça login.");
@@ -391,7 +757,6 @@ export async function requestWorkspace(data: RequestWorkspaceInput) {
     throw new Error("O nome do espaço de trabalho é obrigatório.");
   }
 
-  // Gera slug seguro
   const baseSlug = data.name
     .toLowerCase()
     .normalize("NFD")
@@ -402,32 +767,32 @@ export async function requestWorkspace(data: RequestWorkspaceInput) {
   const slug = `${baseSlug}-${randomSuffix}`;
 
   try {
-    const isProfessor = user.role === "PROFESSOR";
-    const initialStatus = isProfessor ? "APPROVED" : "PENDING";
+    const initialStatus = canApproveInLab ? "APPROVED" : "PENDING";
 
     const workspace = await prisma.workspace.create({
       data: {
+        labId: activeLabId,
         name: data.name.trim(),
         slug: slug,
-        department: data.department?.trim() || "Living Lab CTPP",
+        department: data.department?.trim() || activeLab.departmentName,
         description: data.description?.trim() || null,
         status: initialStatus,
         requestedById: user.id,
-        approvedById: isProfessor ? user.id : null,
-        approvedAt: isProfessor ? new Date() : null,
+        approvedById: canApproveInLab ? user.id : null,
+        approvedAt: canApproveInLab ? new Date() : null,
         columns: {
           create: [
-            { title: "A Fazer", order: 0 },
-            { title: "Em Andamento", order: 1 },
-            { title: "Revisão", order: 2 },
-            { title: "Concluído", order: 3 },
+            { labId: activeLabId, title: "A Fazer", order: 0 },
+            { labId: activeLabId, title: "Em Andamento", order: 1 },
+            { labId: activeLabId, title: "Revisão", order: 2 },
+            { labId: activeLabId, title: "Concluído", order: 3 },
           ],
         },
         members: {
           create: [
             {
               userId: user.id,
-              role: isProfessor ? "OWNER" : "MEMBER",
+              role: canApproveInLab ? "OWNER" : "MEMBER",
             },
           ],
         },
@@ -456,10 +821,10 @@ export interface CreateTaskInput {
 }
 
 /**
- * Server Action: Criar Nova Atividade no Quadro Kanban
+ * Server Action: Criar Nova Atividade no Quadro Kanban (vinculada ao labId do Workspace)
  */
 export async function createTask(data: CreateTaskInput) {
-  const user = await getAuthenticatedUser();
+  const { user, activeLabId } = await getActiveLabContext();
 
   if (!user) {
     throw new Error("Não autenticado. Por favor, faça login.");
@@ -470,7 +835,12 @@ export async function createTask(data: CreateTaskInput) {
   }
 
   try {
-    // Se não tiver columnId, busca a primeira coluna do workspace
+    const ws = await prisma.workspace.findUnique({
+      where: { id: data.workspaceId },
+      select: { labId: true },
+    });
+    const resolvedLabId = ws?.labId || activeLabId;
+
     let targetColumnId = data.columnId;
     if (!targetColumnId) {
       const firstCol = await prisma.kanbanColumn.findFirst({
@@ -489,6 +859,7 @@ export async function createTask(data: CreateTaskInput) {
 
     const task = await prisma.task.create({
       data: {
+        labId: resolvedLabId,
         title: data.title.trim(),
         description: data.description?.trim() || null,
         priority: data.priority || "MEDIUM",
@@ -524,10 +895,10 @@ export interface CreateDocumentInput {
 }
 
 /**
- * Server Action: Criar Nova Página de Documentação / Notas
+ * Server Action: Criar Nova Página de Documentação / Notas no Laboratório Ativo
  */
 export async function createDocument(data: CreateDocumentInput) {
-  const user = await getAuthenticatedUser();
+  const { user, activeLabId } = await getActiveLabContext();
 
   if (!user) {
     throw new Error("Não autenticado. Por favor, faça login.");
@@ -538,11 +909,21 @@ export async function createDocument(data: CreateDocumentInput) {
   }
 
   try {
+    let resolvedLabId = activeLabId;
+    if (data.workspaceId) {
+      const ws = await prisma.workspace.findUnique({
+        where: { id: data.workspaceId },
+        select: { labId: true },
+      });
+      if (ws) resolvedLabId = ws.labId;
+    }
+
     const doc = await prisma.document.create({
       data: {
+        labId: resolvedLabId,
         title: data.title.trim(),
         icon: data.icon || "📄",
-        type: data.workspaceId ? "WORKSPACE" : (data.type || "PERSONAL"),
+        type: data.workspaceId ? "WORKSPACE" : data.type || "PERSONAL",
         workspaceId: data.workspaceId || null,
         ownerId: user.id,
         content: [
@@ -586,23 +967,20 @@ export interface PlatformSettingsInput {
 }
 
 /**
- * Server Action: Atualizar Configurações White-label da Plataforma (Restrito ao PROFESSOR)
+ * Server Action: Atualizar Configurações White-label do Laboratório Ativo (Restrito ao Responsável PROFESSOR)
  */
 export async function updatePlatformSettings(data: PlatformSettingsInput) {
-  const user = await getAuthenticatedUser();
+  const { user, activeLabId, canManageLab } = await getActiveLabContext();
 
   if (!user) {
     throw new Error("Não autenticado. Por favor, faça login.");
   }
 
-  if (user.role !== "PROFESSOR") {
-    throw new Error("Apenas Professores e Coordenadores podem alterar as configurações da plataforma.");
+  if (!canManageLab) {
+    throw new Error("Apenas o Professor Responsável pelo laboratório pode alterar as configurações White-label.");
   }
 
   try {
-    const existing = await prisma.platformSettings.findFirst();
-    const targetId = existing?.id || "default-settings";
-
     const updatePayload: any = {
       labName: data.labName.trim(),
       institutionName: data.institutionName?.trim(),
@@ -619,10 +997,10 @@ export async function updatePlatformSettings(data: PlatformSettingsInput) {
     if (data.fontColorDark !== undefined) updatePayload.fontColorDark = data.fontColorDark;
 
     const createPayload: any = {
-      id: targetId,
+      labId: activeLabId,
       labName: data.labName.trim(),
       institutionName: data.institutionName?.trim() || "UNIFESP",
-      departmentName: data.departmentName?.trim() || "Living Lab CTPP",
+      departmentName: data.departmentName?.trim() || "Living Lab",
       primaryColor: data.primaryColor || "#0E4330",
       secondaryColor: data.secondaryColor || "#24576C",
       accentColor: data.accentColor || "#1F8A64",
@@ -633,18 +1011,38 @@ export async function updatePlatformSettings(data: PlatformSettingsInput) {
       supportEmail: data.supportEmail?.trim() || "labtecpp@unifesp.br",
     };
 
+    // 1. Atualiza PlatformSettings do laboratório ativo
     const updated = await prisma.platformSettings.upsert({
-      where: { id: targetId },
+      where: { labId: activeLabId },
       create: createPayload,
       update: updatePayload,
     });
 
-    revalidatePath("/");
+    // 2. Sincroniza também os metadados diretamente na entidade Laboratory
+    await prisma.laboratory.update({
+      where: { id: activeLabId },
+      data: {
+        name: data.labName.trim(),
+        institutionName: data.institutionName?.trim() || undefined,
+        departmentName: data.departmentName?.trim() || undefined,
+        primaryColor: data.primaryColor || undefined,
+        secondaryColor: data.secondaryColor || undefined,
+        accentColor: data.accentColor || undefined,
+        fontColorLight: data.fontColorLight !== undefined ? data.fontColorLight : undefined,
+        fontColorDark: data.fontColorDark !== undefined ? data.fontColorDark : undefined,
+        logoUrl: data.logoUrl !== undefined ? data.logoUrl?.trim() || null : undefined,
+        faviconUrl: data.faviconUrl !== undefined ? data.faviconUrl?.trim() || null : undefined,
+        supportEmail: data.supportEmail?.trim() || undefined,
+      },
+    });
+
+    revalidatePath("/", "layout");
+    revalidatePath("/labs");
     revalidatePath("/admin/settings");
     return { success: true, settings: updated };
   } catch (error) {
     console.error("[updatePlatformSettings Error]:", error);
-    throw new Error("Erro ao atualizar configurações da plataforma.");
+    throw new Error("Erro ao atualizar configurações White-label do laboratório.");
   }
 }
 
@@ -658,19 +1056,25 @@ export interface CreateKanbanColumnInput {
  * Server Action: Criar Novo Bucket / Coluna no Kanban
  */
 export async function createKanbanColumn(data: CreateKanbanColumnInput) {
-  const user = await getAuthenticatedUser();
+  const { user, activeLabId } = await getActiveLabContext();
   if (!user) throw new Error("Não autenticado. Por favor, faça login.");
   if (!data.title || data.title.trim() === "") {
     throw new Error("O nome do bucket/coluna é obrigatório.");
   }
 
   try {
+    const ws = await prisma.workspace.findUnique({
+      where: { id: data.workspaceId },
+      select: { labId: true },
+    });
+
     const columnCount = await prisma.kanbanColumn.count({
       where: { workspaceId: data.workspaceId },
     });
 
     const column = await prisma.kanbanColumn.create({
       data: {
+        labId: ws?.labId || activeLabId,
         workspaceId: data.workspaceId,
         title: data.title.trim(),
         order: columnCount,
@@ -759,7 +1163,6 @@ export async function updateTask(data: UpdateTaskInput) {
       },
     });
 
-    // Sincroniza pesquisadores atribuídos
     if (data.assigneeUserIds !== undefined) {
       await prisma.taskAssignee.deleteMany({
         where: { taskId: data.taskId },
@@ -774,7 +1177,6 @@ export async function updateTask(data: UpdateTaskInput) {
           skipDuplicates: true,
         });
 
-        // Garante automaticamente que os usuários atribuídos à tarefa também sejam membros do workspace
         for (const userId of data.assigneeUserIds) {
           await prisma.workspaceMember.upsert({
             where: {
@@ -913,7 +1315,7 @@ export async function deleteWorkspaceDocument(docId: string, workspaceId?: strin
 }
 
 // ==========================================
-// 10. CONTROLE DE INTEGRANTES & ATRIBUIÇÕES (RBAC DINÂMICO)
+// 10. CONTROLE DE INTEGRANTES & ATRIBUIÇÕES POR LABORATÓRIO
 // ==========================================
 
 const DEFAULT_ATTRIBUTIONS = [
@@ -975,23 +1377,36 @@ const DEFAULT_ATTRIBUTIONS = [
 ];
 
 /**
- * Busca todas as atribuições cadastradas no sistema (com contagem de integrantes)
+ * Busca todas as atribuições cadastradas no laboratório ativo (com contagem de integrantes)
  */
 export async function getLabAttributions() {
   try {
-    // Garante que as atribuições padrão existam se a tabela estiver vazia
-    const count = await prisma.attribution.count();
+    const { activeLabId } = await getActiveLabContext();
+
+    const count = await prisma.attribution.count({
+      where: { labId: activeLabId },
+    });
+
     if (count === 0) {
       for (const attr of DEFAULT_ATTRIBUTIONS) {
         await prisma.attribution.upsert({
-          where: { slug: attr.slug },
+          where: {
+            labId_slug: {
+              labId: activeLabId,
+              slug: attr.slug,
+            },
+          },
           update: {},
-          create: attr,
+          create: {
+            ...attr,
+            labId: activeLabId,
+          },
         });
       }
     }
 
     const attributions = await prisma.attribution.findMany({
+      where: { labId: activeLabId },
       orderBy: { createdAt: "asc" },
       include: {
         _count: {
@@ -1002,6 +1417,7 @@ export async function getLabAttributions() {
 
     return attributions.map((a) => ({
       id: a.id,
+      labId: a.labId,
       name: a.name,
       slug: a.slug,
       description: a.description,
@@ -1016,7 +1432,7 @@ export async function getLabAttributions() {
 }
 
 /**
- * Cria uma nova atribuição customizada
+ * Cria uma nova atribuição customizada no laboratório ativo
  */
 export async function createLabAttribution(data: {
   name: string;
@@ -1024,10 +1440,10 @@ export async function createLabAttribution(data: {
   color?: string;
   permissions: string[];
 }) {
-  const user = await getAuthenticatedUser();
+  const { user, activeLabId, canApproveInLab } = await getActiveLabContext();
   if (!user) throw new Error("Não autenticado. Por favor, faça login.");
-  if (user.role !== "PROFESSOR") {
-    throw new Error("Acesso negado: apenas Professores podem criar novas atribuições.");
+  if (!canApproveInLab) {
+    throw new Error("Acesso negado: apenas o Responsável e os Líderes do laboratório podem criar atribuições.");
   }
 
   const slug = data.name
@@ -1040,6 +1456,7 @@ export async function createLabAttribution(data: {
   try {
     const attribution = await prisma.attribution.create({
       data: {
+        labId: activeLabId,
         name: data.name.trim(),
         slug: slug || `attr-${Date.now()}`,
         description: data.description?.trim() || null,
@@ -1052,12 +1469,12 @@ export async function createLabAttribution(data: {
     return { success: true, attribution };
   } catch (error) {
     console.error("[createLabAttribution Error]:", error);
-    throw new Error("Erro ao criar a atribuição. Verifique se o nome já existe.");
+    throw new Error("Erro ao criar a atribuição neste laboratório. Verifique se o nome já existe.");
   }
 }
 
 /**
- * Atualiza uma atribuição existente
+ * Atualiza uma atribuição existente do laboratório ativo
  */
 export async function updateLabAttribution(data: {
   id: string;
@@ -1066,10 +1483,10 @@ export async function updateLabAttribution(data: {
   color?: string;
   permissions: string[];
 }) {
-  const user = await getAuthenticatedUser();
+  const { user, activeLabId, canApproveInLab } = await getActiveLabContext();
   if (!user) throw new Error("Não autenticado. Por favor, faça login.");
-  if (user.role !== "PROFESSOR") {
-    throw new Error("Acesso negado: apenas Professores podem editar atribuições.");
+  if (!canApproveInLab) {
+    throw new Error("Acesso negado: apenas o Responsável e os Líderes do laboratório podem editar atribuições.");
   }
 
   const slug = data.name
@@ -1081,7 +1498,7 @@ export async function updateLabAttribution(data: {
 
   try {
     const updated = await prisma.attribution.update({
-      where: { id: data.id },
+      where: { id: data.id, labId: activeLabId },
       data: {
         name: data.name.trim(),
         slug: slug || `attr-${Date.now()}`,
@@ -1100,18 +1517,18 @@ export async function updateLabAttribution(data: {
 }
 
 /**
- * Remove uma atribuição do sistema
+ * Remove uma atribuição do laboratório ativo
  */
 export async function deleteLabAttribution(id: string) {
-  const user = await getAuthenticatedUser();
+  const { user, activeLabId, canApproveInLab } = await getActiveLabContext();
   if (!user) throw new Error("Não autenticado. Por favor, faça login.");
-  if (user.role !== "PROFESSOR") {
-    throw new Error("Acesso negado: apenas Professores podem excluir atribuições.");
+  if (!canApproveInLab) {
+    throw new Error("Acesso negado: apenas o Responsável e os Líderes do laboratório podem excluir atribuições.");
   }
 
   try {
     await prisma.attribution.delete({
-      where: { id },
+      where: { id, labId: activeLabId },
     });
 
     revalidatePath("/members");
@@ -1123,61 +1540,66 @@ export async function deleteLabAttribution(id: string) {
 }
 
 /**
- * Lista todos os integrantes do laboratório com dados consolidados
+ * Lista todos os integrantes vinculados ao laboratório ativo com dados consolidados
  */
 export async function getLabMembers() {
   try {
-    const users = await prisma.user.findMany({
-      orderBy: [
-        { role: "asc" },
-        { name: "asc" },
-      ],
+    const { activeLabId } = await getActiveLabContext();
+
+    const memberships = await prisma.labMembership.findMany({
+      where: { labId: activeLabId },
+      orderBy: [{ role: "asc" }, { createdAt: "asc" }],
       include: {
-        attributions: {
+        user: {
           include: {
-            attribution: true,
-          },
-        },
-        workspaceMemberships: {
-          include: {
-            workspace: {
-              select: { id: true, name: true, slug: true },
+            attributions: {
+              where: { labId: activeLabId },
+              include: { attribution: true },
             },
-          },
-        },
-        _count: {
-          select: {
-            timeEntries: true,
-            assignedTasks: true,
+            workspaceMemberships: {
+              where: { workspace: { labId: activeLabId } },
+              include: {
+                workspace: { select: { id: true, name: true, slug: true } },
+              },
+            },
+            _count: {
+              select: {
+                timeEntries: { where: { labId: activeLabId } },
+                assignedTasks: { where: { task: { labId: activeLabId } } },
+              },
+            },
           },
         },
       },
     });
 
-    return users.map((u) => ({
-      id: u.id,
-      name: u.name,
-      email: u.email,
-      image: u.image,
-      role: u.role,
-      status: u.status,
-      academicId: u.academicId,
-      phone: u.phone,
-      course: u.course,
-      bio: u.bio,
-      createdAt: u.createdAt.toISOString(),
-      attributions: u.attributions.map((ua) => ({
-        id: ua.attribution.id,
-        name: ua.attribution.name,
-        slug: ua.attribution.slug,
-        color: ua.attribution.color,
-        permissions: ua.attribution.permissions,
-      })),
-      workspaceCount: u.workspaceMemberships.length,
-      workspaces: u.workspaceMemberships.map((wm) => wm.workspace),
-      timeEntriesCount: u._count.timeEntries,
-      tasksCount: u._count.assignedTasks,
-    }));
+    return memberships.map((m) => {
+      const u = m.user;
+      return {
+        id: u.id,
+        name: u.name,
+        email: u.email,
+        image: u.image,
+        role: m.role,
+        status: m.status,
+        academicId: u.academicId,
+        phone: u.phone,
+        course: u.course,
+        bio: u.bio,
+        createdAt: m.createdAt.toISOString(),
+        attributions: u.attributions.map((ua) => ({
+          id: ua.attribution.id,
+          name: ua.attribution.name,
+          slug: ua.attribution.slug,
+          color: ua.attribution.color,
+          permissions: ua.attribution.permissions,
+        })),
+        workspaceCount: u.workspaceMemberships.length,
+        workspaces: u.workspaceMemberships.map((wm) => wm.workspace),
+        timeEntriesCount: u._count.timeEntries,
+        tasksCount: u._count.assignedTasks,
+      };
+    });
   } catch (error) {
     console.error("[getLabMembers Error]:", error);
     return [];
@@ -1185,7 +1607,7 @@ export async function getLabMembers() {
 }
 
 /**
- * Atualiza o papel, status e atribuições de um integrante
+ * Atualiza o papel, status e atribuições de um integrante dentro do laboratório ativo
  */
 export async function updateMemberRoleAndAttributions(data: {
   userId: string;
@@ -1193,17 +1615,37 @@ export async function updateMemberRoleAndAttributions(data: {
   status: "ACTIVE" | "WAITING_APPROVAL" | "PENDING" | "REJECTED" | "SUSPENDED";
   attributionIds: string[];
 }) {
-  const admin = await getAuthenticatedUser();
+  const { user: admin, activeLabId, roleInLab, canApproveInLab } = await getActiveLabContext();
   if (!admin) throw new Error("Não autenticado. Por favor, faça login.");
-  if (admin.role !== "PROFESSOR") {
-    throw new Error("Acesso negado: apenas Professores podem gerenciar papéis e atribuições de integrantes.");
+  if (!canApproveInLab) {
+    throw new Error(
+      "Acesso negado: apenas o Responsável do Laboratório e os Líderes podem gerenciar integrantes."
+    );
+  }
+
+  // Líderes não podem promover outro usuário a PROFESSOR (apenas o Professor Responsável pode)
+  if (data.role === "PROFESSOR" && roleInLab !== "PROFESSOR") {
+    throw new Error("Apenas o Professor Responsável pode conceder o papel de Professor.");
   }
 
   try {
-    // 1. Atualiza papel e status do usuário
-    const updatedUser = await prisma.user.update({
-      where: { id: data.userId },
-      data: {
+    // 1. Atualiza o vínculo do usuário no laboratório ativo (LabMembership)
+    await prisma.labMembership.upsert({
+      where: {
+        labId_userId: {
+          labId: activeLabId,
+          userId: data.userId,
+        },
+      },
+      update: {
+        role: data.role,
+        status: data.status,
+        approvedById: admin.id,
+        approvedAt: data.status === "ACTIVE" ? new Date() : undefined,
+      },
+      create: {
+        labId: activeLabId,
+        userId: data.userId,
         role: data.role,
         status: data.status,
         approvedById: admin.id,
@@ -1211,14 +1653,23 @@ export async function updateMemberRoleAndAttributions(data: {
       },
     });
 
-    // 2. Sincroniza atribuições
+    // Sincroniza status global do usuário caso tenha sido ativado
+    if (data.status === "ACTIVE") {
+      await prisma.user.update({
+        where: { id: data.userId },
+        data: { status: "ACTIVE" },
+      });
+    }
+
+    // 2. Sincroniza atribuições do integrante neste laboratório
     await prisma.userAttribution.deleteMany({
-      where: { userId: data.userId },
+      where: { userId: data.userId, labId: activeLabId },
     });
 
     if (data.attributionIds && data.attributionIds.length > 0) {
       await prisma.userAttribution.createMany({
         data: data.attributionIds.map((attrId) => ({
+          labId: activeLabId,
           userId: data.userId,
           attributionId: attrId,
         })),
@@ -1229,11 +1680,9 @@ export async function updateMemberRoleAndAttributions(data: {
     revalidatePath("/members");
     revalidatePath("/");
     revalidatePath("/admin/approvals");
-    return { success: true, user: updatedUser };
+    return { success: true };
   } catch (error) {
     console.error("[updateMemberRoleAndAttributions Error]:", error);
-    throw new Error("Erro ao atualizar o integrante.");
+    throw new Error("Erro ao atualizar o integrante no laboratório.");
   }
 }
-
-

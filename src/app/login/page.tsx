@@ -9,7 +9,7 @@ import { Button } from "@/components/ui/button";
 
 function LoginForm() {
   const searchParams = useSearchParams();
-  const callbackUrl = searchParams.get("callbackUrl") || "/";
+  const callbackUrl = searchParams.get("callbackUrl") || "/labs";
   const error = searchParams.get("error");
   const [isLoading, setIsLoading] = useState(false);
 

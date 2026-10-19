@@ -1,7 +1,7 @@
 import React from "react";
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/auth";
+import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
+import { getActiveLabContext } from "@/lib/lab-context";
 import { getPlatformSettings } from "@/lib/settings";
 import { Sidebar } from "@/components/layout/sidebar";
 import { Header } from "@/components/layout/header";
@@ -11,42 +11,74 @@ export default async function DashboardLayout({
 }: {
   children: React.ReactNode;
 }) {
-  const session = await getServerSession(authOptions);
+  const {
+    user,
+    activeLabId,
+    roleInLab,
+    statusInLab,
+    approvedLabs,
+  } = await getActiveLabContext();
 
-  // Busca dinâmica dos braços ativos, contadores reais e configurações de marca
-  const [activeWorkspaces, activeCount, pendingCount, platformSettings] = await Promise.all([
+  if (user && statusInLab !== "ACTIVE" && approvedLabs.length === 0) {
+    if (user.status === "PENDING") {
+      redirect("/onboarding");
+    }
+    redirect("/waiting-room");
+  }
+
+  // Busca dinâmica dos braços ativos, contadores reais e configurações White-label do laboratório ativo
+  const [
+    activeWorkspaces,
+    activeCount,
+    pendingWorkspacesCount,
+    pendingUsersCount,
+    platformSettings,
+  ] = await Promise.all([
     prisma.workspace.findMany({
-      where: { status: "APPROVED" },
+      where: { labId: activeLabId, status: "APPROVED" },
       select: { id: true, name: true, slug: true },
       orderBy: { createdAt: "asc" },
       take: 6,
     }),
     prisma.workspace.count({
-      where: { status: "APPROVED" },
+      where: { labId: activeLabId, status: "APPROVED" },
     }),
     prisma.workspace.count({
-      where: { status: "PENDING" },
+      where: { labId: activeLabId, status: "PENDING" },
     }),
-    getPlatformSettings(),
+    prisma.labMembership.count({
+      where: { labId: activeLabId, status: "WAITING_APPROVAL" },
+    }),
+    getPlatformSettings(activeLabId),
   ]);
+
+  const totalPendingApprovals = pendingWorkspacesCount + pendingUsersCount;
 
   return (
     <div className="flex h-screen w-full overflow-hidden bg-background">
-      {/* Sidebar 100% Dinâmica com Dados Reais da Sessão, Banco e White-label */}
+      {/* Sidebar 100% Dinâmica com Dados Reais da Sessão, Laboratório Ativo e White-label */}
       <Sidebar
         currentUser={
-          session?.user
+          user
             ? {
-                name: session.user.name || "Integrante UNIFESP",
-                email: session.user.email || "",
-                role: session.user.role || "STUDENT",
-                avatarUrl: session.user.image || undefined,
+                name: user.name || "Integrante UNIFESP",
+                email: user.email || "",
+                role: roleInLab,
+                avatarUrl: user.image || undefined,
               }
             : undefined
         }
+        activeLabId={activeLabId}
+        approvedLabs={approvedLabs.map((l) => ({
+          id: l.id,
+          name: l.name,
+          slug: l.slug,
+          primaryColor: l.primaryColor,
+          role: l.membershipRole,
+        }))}
         workspaces={activeWorkspaces}
         activeWorkspacesCount={activeCount}
-        pendingApprovalsCount={pendingCount}
+        pendingApprovalsCount={totalPendingApprovals}
         brandSettings={{
           labName: platformSettings.labName,
           institutionName: platformSettings.institutionName,

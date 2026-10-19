@@ -1,9 +1,8 @@
 import React from "react";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { getActiveLabContext } from "@/lib/lab-context";
 import { KanbanSquare, ArrowLeft } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -17,8 +16,8 @@ interface KanbanPageProps {
 }
 
 export default async function WorkspaceKanbanPage({ params }: KanbanPageProps) {
-  const session = await getServerSession(authOptions);
-  if (!session?.user?.id) {
+  const { user } = await getActiveLabContext();
+  if (!user) {
     redirect("/login");
   }
 
@@ -58,26 +57,24 @@ export default async function WorkspaceKanbanPage({ params }: KanbanPageProps) {
     notFound();
   }
 
-  // Busca dinamicamente todos os usuários cadastrados e ativos no sistema
-  // (pesquisadores, líderes e professores ativos na plataforma)
-  const registeredUsers = await prisma.user.findMany({
+  // Busca todos os integrantes vinculados ao laboratório deste workspace
+  const labMemberships = await prisma.labMembership.findMany({
     where: {
+      labId: workspace.labId,
       status: { notIn: ["REJECTED", "SUSPENDED"] },
     },
-    select: {
-      id: true,
-      name: true,
-      email: true,
-      image: true,
-      role: true,
+    include: {
+      user: {
+        select: {
+          id: true,
+          name: true,
+          email: true,
+          image: true,
+        },
+      },
     },
-    orderBy: [
-      { name: "asc" },
-      { email: "asc" },
-    ],
   });
 
-  // Mapeia por ID garantindo unicidade e disponibilizando todos os pesquisadores para atribuição dinâmica
   const assignableUsersMap = new Map<
     string,
     {
@@ -89,9 +86,17 @@ export default async function WorkspaceKanbanPage({ params }: KanbanPageProps) {
     }
   >();
 
-  // 1. Prioriza todos os usuários reais cadastrados no banco
-  for (const u of registeredUsers) {
-    assignableUsersMap.set(u.id, u);
+  // 1. Prioriza todos os usuários vinculados ao laboratório deste workspace
+  for (const lm of labMemberships) {
+    if (lm.user) {
+      assignableUsersMap.set(lm.user.id, {
+        id: lm.user.id,
+        name: lm.user.name,
+        email: lm.user.email,
+        image: lm.user.image,
+        role: lm.role,
+      });
+    }
   }
 
   // 2. Inclui quaisquer membros já vinculados ao workspace

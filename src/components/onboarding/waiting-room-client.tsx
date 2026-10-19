@@ -1,6 +1,7 @@
 "use client";
 
-import React, { useState, useTransition } from "react";
+import React, { useTransition } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { signOut } from "next-auth/react";
 import {
@@ -17,11 +18,10 @@ import {
   Clock,
   RefreshCw,
   LogOut,
-  ShieldAlert,
-  UserCheck,
-  CheckCircle,
   FileCheck2,
+  Building2,
 } from "lucide-react";
+import type { LaboratorySummary } from "@/types";
 
 interface WaitingRoomClientProps {
   user: {
@@ -35,9 +35,10 @@ interface WaitingRoomClientProps {
     course: string | null;
     createdAt: Date;
   };
+  pendingLabs?: LaboratorySummary[];
 }
 
-export function WaitingRoomClient({ user }: WaitingRoomClientProps) {
+export function WaitingRoomClient({ user, pendingLabs = [] }: WaitingRoomClientProps) {
   const router = useRouter();
   const [isRefreshing, startTransition] = useTransition();
 
@@ -59,24 +60,24 @@ export function WaitingRoomClient({ user }: WaitingRoomClientProps) {
         </div>
 
         <div className="flex items-center justify-center font-bold tracking-tight text-xl leading-none">
-          <span className="text-primary font-black">Lab</span>
-          <span className="text-secondary ml-1 font-extrabold">CTPP</span>
+          <span className="text-primary font-black">LabGest</span>
+          <span className="text-secondary ml-1 font-extrabold">UNIFESP</span>
         </div>
         <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-widest mt-1">
-          Living Lab • UNIFESP
+          Plataforma Multi-Laboratórios • UNIFESP
         </p>
 
         <CardTitle className="text-lg font-bold text-foreground mt-4">
           Sala de Espera e Triagem
         </CardTitle>
         <CardDescription className="text-xs max-w-sm mx-auto mt-1">
-          Sua solicitação de ingresso foi registrada com sucesso e aguarda homologação pela Coordenação Geral do Laboratório.
+          Seu pedido de triagem foi enviado ao Responsável do Laboratório e aos Líderes para homologação.
         </CardDescription>
       </CardHeader>
 
       <CardContent className="space-y-4">
         {/* Status Badge e Card Informativo */}
-        <div className="rounded-xl border border-amber-200/80 bg-amber-50/60 dark:bg-amber-950/20 dark:border-amber-900/40 p-4 space-y-2">
+        <div className="rounded-xl border border-amber-200/80 bg-amber-50/60 dark:bg-amber-950/20 dark:border-amber-900/40 p-4 space-y-2.5">
           <div className="flex items-center justify-between">
             <span className="text-xs font-semibold text-amber-900 dark:text-amber-200 flex items-center gap-1.5">
               <FileCheck2 className="h-4 w-4 text-amber-600 dark:text-amber-400" />
@@ -86,8 +87,34 @@ export function WaitingRoomClient({ user }: WaitingRoomClientProps) {
               Aguardando Aprovação
             </Badge>
           </div>
+
+          {pendingLabs.length > 0 && (
+            <div className="space-y-1.5 pt-1">
+              <span className="text-[11px] font-semibold text-amber-900 dark:text-amber-200 block">
+                Laboratório(s) solicitado(s) para triagem:
+              </span>
+              {pendingLabs.map((lab) => (
+                <div
+                  key={lab.id}
+                  className="flex items-center justify-between rounded-lg bg-white/80 dark:bg-background/60 px-3 py-2 border border-amber-200/60 dark:border-amber-800/40 text-xs"
+                >
+                  <span className="font-bold text-foreground flex items-center gap-1.5">
+                    <span
+                      className="h-2.5 w-2.5 rounded-full inline-block"
+                      style={{ backgroundColor: lab.primaryColor }}
+                    />
+                    {lab.name}
+                  </span>
+                  <span className="text-[10px] text-muted-foreground">
+                    {lab.departmentName}
+                  </span>
+                </div>
+              ))}
+            </div>
+          )}
+
           <p className="text-[11px] text-amber-800/90 dark:text-amber-300/80 leading-relaxed">
-            Durante a triagem, a coordenação definirá sua função (Integrante ou Líder), suas atribuições no laboratório e alocará seu perfil nos projetos correspondentes.
+            O <strong>Responsável do Laboratório (Professor)</strong> e os <strong>Líderes</strong> avaliam os pedidos de triagem e alocam novos integrantes nos braços de pesquisa.
           </p>
         </div>
 
@@ -125,7 +152,7 @@ export function WaitingRoomClient({ user }: WaitingRoomClientProps) {
         </div>
       </CardContent>
 
-      <CardFooter className="pt-2 pb-6 flex flex-col gap-3">
+      <CardFooter className="pt-2 pb-6 flex flex-col gap-2.5">
         <Button
           type="button"
           onClick={handleRefresh}
@@ -134,6 +161,18 @@ export function WaitingRoomClient({ user }: WaitingRoomClientProps) {
         >
           <RefreshCw className={`h-4 w-4 ${isRefreshing ? "animate-spin" : ""}`} />
           <span>Verificar se Fui Aprovado</span>
+        </Button>
+
+        <Button
+          asChild
+          variant="outline"
+          size="sm"
+          className="w-full h-9 text-xs gap-1.5"
+        >
+          <Link href="/labs">
+            <Building2 className="h-3.5 w-3.5 text-primary" />
+            <span>Ver Outros Laboratórios Disponíveis</span>
+          </Link>
         </Button>
 
         <Button

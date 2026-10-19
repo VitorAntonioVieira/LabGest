@@ -69,7 +69,7 @@ export function MembersManagementClient({
   const [attributionToEdit, setAttributionToEdit] = useState<AttributionSummary | null>(null);
   const [isAttributionModalOpen, setIsAttributionModalOpen] = useState(false);
 
-  const canManage = currentUserRole === "PROFESSOR";
+  const canManage = currentUserRole === "PROFESSOR" || currentUserRole === "LEADER";
 
   // Métricas
   const totalMembers = members.length;

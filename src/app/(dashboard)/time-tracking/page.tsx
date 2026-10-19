@@ -1,28 +1,27 @@
 import React from "react";
 import { redirect } from "next/navigation";
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import { Clock, Plus, Calendar, CheckCircle2, TrendingUp } from "lucide-react";
+import { getActiveLabContext } from "@/lib/lab-context";
+import { Clock, CheckCircle2 } from "lucide-react";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { TimeEntryButton } from "@/components/dashboard/time-entry-button";
 import { formatMinutesToHours } from "@/lib/utils";
 
 export default async function TimeTrackingPage() {
-  const session = await getServerSession(authOptions);
+  const { user, activeLab, activeLabId } = await getActiveLabContext();
 
-  if (!session?.user?.id) {
+  if (!user) {
     redirect("/login");
   }
 
-  const userId = session.user.id;
+  const userId = user.id;
 
-  // Busca todos os apontamentos de horas
+  // Busca todos os apontamentos de horas do usuário no laboratório ativo
   const entries = await prisma.timeEntry.findMany({
     where: {
+      labId: activeLabId,
       userId: userId,
     },
     include: {
@@ -48,9 +47,9 @@ export default async function TimeTrackingPage() {
   const hoursGoal = 40;
   const progressPercent = Math.min(100, Math.round((totalMinutesThisMonth / (hoursGoal * 60)) * 100));
 
-  // Tarefas para o modal
+  // Tarefas disponíveis no laboratório ativo para o modal
   const availableTasksRaw = await prisma.task.findMany({
-    where: { completedAt: null },
+    where: { labId: activeLabId, completedAt: null },
     select: {
       id: true,
       title: true,
@@ -73,7 +72,7 @@ export default async function TimeTrackingPage() {
         <div>
           <div className="flex items-center gap-2 mb-1">
             <Badge variant="lab" className="text-xs">
-              Apontamento de Horas
+              {activeLab.name} • Apontamento de Horas
             </Badge>
           </div>
           <h1 className="text-2xl font-bold tracking-tight text-foreground sm:text-3xl flex items-center gap-2.5">
@@ -81,7 +80,7 @@ export default async function TimeTrackingPage() {
             Gestão & Registro de Horas de Pesquisa
           </h1>
           <p className="text-sm text-muted-foreground mt-1">
-            Registre suas atividades semanais para cumprimento da carga horária acadêmica e emissão de certificados.
+            Registre suas atividades semanais no <strong>{activeLab.name}</strong> para cumprimento da carga horária acadêmica e emissão de certificados.
           </p>
         </div>
 
@@ -117,7 +116,7 @@ export default async function TimeTrackingPage() {
           <CardContent className="space-y-1">
             <div className="text-3xl font-extrabold text-foreground">{entries.length}</div>
             <p className="text-xs text-muted-foreground">
-              Total de sessões de trabalho lançadas no histórico
+              Total de sessões de trabalho lançadas neste laboratório
             </p>
           </CardContent>
         </Card>
@@ -134,7 +133,7 @@ export default async function TimeTrackingPage() {
               Regular
             </div>
             <p className="text-xs text-muted-foreground">
-              Suas horas foram validadas pelo coordenador
+              Suas horas foram validadas pela coordenação do laboratório
             </p>
           </CardContent>
         </Card>
@@ -144,16 +143,16 @@ export default async function TimeTrackingPage() {
       <Card className="border border-border shadow-2xs">
         <CardHeader className="pb-3">
           <CardTitle className="text-sm font-bold text-foreground">
-            Histórico de Apontamentos
+            Histórico de Apontamentos ({activeLab.name})
           </CardTitle>
           <CardDescription className="text-xs">
-            Lista de todas as tarefas e resumos de atividades executadas.
+            Lista de todas as tarefas e resumos de atividades executadas neste laboratório.
           </CardDescription>
         </CardHeader>
         <CardContent>
           {entries.length === 0 ? (
             <div className="p-8 text-center border border-dashed rounded-lg text-xs text-muted-foreground">
-              Nenhum apontamento registrado ainda. Clique em "Apontar Horas" para começar!
+              Nenhum apontamento registrado ainda neste laboratório. Clique em "Apontar Horas" para começar!
             </div>
           ) : (
             <div className="overflow-x-auto">

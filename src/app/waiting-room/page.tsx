@@ -1,39 +1,20 @@
 import React from "react";
 import { redirect } from "next/navigation";
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/auth";
-import { prisma } from "@/lib/prisma";
+import { getActiveLabContext } from "@/lib/lab-context";
 import { WaitingRoomClient } from "@/components/onboarding/waiting-room-client";
 
+export const dynamic = "force-dynamic";
+
 export default async function WaitingRoomPage() {
-  const session = await getServerSession(authOptions);
-
-  if (!session?.user?.id) {
-    redirect("/login");
-  }
-
-  const user = await prisma.user.findUnique({
-    where: { id: session.user.id },
-    select: {
-      id: true,
-      name: true,
-      email: true,
-      image: true,
-      status: true,
-      academicId: true,
-      phone: true,
-      course: true,
-      createdAt: true,
-    },
-  });
+  const { user, approvedLabs, pendingLabs } = await getActiveLabContext();
 
   if (!user) {
     redirect("/login");
   }
 
-  // Se já está ativo, vai para o dashboard
-  if (user.status === "ACTIVE") {
-    redirect("/");
+  // Se já foi aprovado em ao menos um laboratório, exibe a tela de laboratórios disponíveis (/labs)
+  if (approvedLabs.length > 0) {
+    redirect("/labs");
   }
 
   // Se ainda não preencheu o formulário inicial
@@ -44,7 +25,20 @@ export default async function WaitingRoomPage() {
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-background via-muted/20 to-primary/5 p-4 sm:p-6">
       <div className="w-full max-w-lg space-y-6">
-        <WaitingRoomClient user={user} />
+        <WaitingRoomClient
+          user={{
+            id: user.id,
+            name: user.name,
+            email: user.email,
+            image: user.image,
+            status: user.status,
+            academicId: user.academicId,
+            phone: user.phone,
+            course: user.course,
+            createdAt: user.createdAt,
+          }}
+          pendingLabs={pendingLabs as any}
+        />
       </div>
     </div>
   );

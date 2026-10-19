@@ -13,21 +13,21 @@ datasource db {
 // ==========================================
 
 enum UserRole {
-  PROFESSOR // Professor / Coordenação Geral: gerencia tudo, aprova workspaces e membros
-  LEADER    // Líder (Gestão): gerencia Kanban e membros do seu Workspace
+  PROFESSOR // Professor / Responsável pelo Laboratório: gerencia tudo, aprova workspaces e membros
+  LEADER    // Líder (Gestão): aprova triagem de membros do lab, gerencia Kanban e membros do Workspace
   STUDENT   // Integrante: executa tarefas, aponta horas e redige anotações
 }
 
 enum UserStatus {
-  PENDING             // Fez login OAuth, mas não preencheu RA e Telefone
-  WAITING_APPROVAL    // Dados enviados, aguardando aprovação na Sala de Espera
-  ACTIVE              // Homologado pelo Professor (acesso irrestrito)
-  REJECTED            // Recusado pela coordenação
+  PENDING             // Fez login OAuth, mas não preencheu RA, Telefone e Laboratório de triagem
+  WAITING_APPROVAL    // Dados enviados, aguardando aprovação do Responsável ou Líderes do Lab
+  ACTIVE              // Homologado no laboratório (acesso liberado)
+  REJECTED            // Recusado pela coordenação/liderança do laboratório
   SUSPENDED           // Acesso temporariamente revogado
 }
 
 enum WorkspaceStatus {
-  PENDING   // Criado recentemente pelo usuário, aguardando aprovação do Professor
+  PENDING   // Criado recentemente pelo usuário, aguardando aprovação
   APPROVED  // Ativo para colaboração
   REJECTED  // Recusado com justificativa
   ARCHIVED  // Concluído ou desativado
@@ -55,7 +55,7 @@ enum TimeEntryStatus {
 
 enum DocType {
   WORKSPACE // Caderno colaborativo compartilhado com o braço de pesquisa
-  PERSONAL  // Caderno pessoal privado do pesquisador/estudante
+  PERSONAL  // Caderno pessoal privado do pesquisador/estudante no laboratório
 }
 
 // ==========================================
@@ -101,7 +101,75 @@ model VerificationToken {
 }
 
 // ==========================================
-// 3. USUÁRIOS
+// 3. MULTI-TENANT: LABORATÓRIOS & VÍNCULOS
+// ==========================================
+
+model Laboratory {
+  id              String   @id @default(cuid())
+  name            String
+  slug            String   @unique
+  description     String?  @db.Text
+  institutionName String   @default("UNIFESP")
+  departmentName  String   @default("Living Lab Universitário")
+  primaryColor    String   @default("#0E4330")
+  secondaryColor  String   @default("#24576C")
+  accentColor     String   @default("#1F8A64")
+  fontColorLight  String?  @default("#111827")
+  fontColorDark   String?  @default("#F8FAFC")
+  logoUrl         String?
+  faviconUrl      String?
+  supportEmail    String?  @default("contato@labctpp.unifesp.br")
+  isActive        Boolean  @default(true)
+
+  responsibleId   String?
+  responsible     User?    @relation("LabResponsible", fields: [responsibleId], references: [id], onDelete: SetNull)
+
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  // Relações Multi-Tenant
+  memberships      LabMembership[]
+  platformSettings PlatformSettings?
+  workspaces       Workspace[]
+  kanbanColumns    KanbanColumn[]
+  tasks            Task[]
+  tags             Tag[]
+  timeEntries      TimeEntry[]
+  documents        Document[]
+  attributions     Attribution[]
+  userAttributions UserAttribution[]
+
+  @@index([slug])
+  @@index([isActive])
+  @@index([responsibleId])
+}
+
+model LabMembership {
+  id             String     @id @default(cuid())
+  labId          String     @default("lab-ctpp")
+  userId         String
+  role           UserRole   @default(STUDENT)
+  status         UserStatus @default(WAITING_APPROVAL)
+  rejectionNotes String?    @db.Text
+
+  approvedById   String?
+  approvedBy     User?      @relation("LabMembershipApprover", fields: [approvedById], references: [id], onDelete: SetNull)
+  approvedAt     DateTime?
+
+  createdAt      DateTime   @default(now())
+  updatedAt      DateTime   @updatedAt
+
+  laboratory     Laboratory @relation(fields: [labId], references: [id], onDelete: Cascade)
+  user           User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([labId, userId])
+  @@index([labId, status])
+  @@index([labId, role])
+  @@index([userId, status])
+}
+
+// ==========================================
+// 4. USUÁRIOS
 // ==========================================
 
 model User {
@@ -111,7 +179,7 @@ model User {
   emailVerified DateTime?
   image         String?
   role          UserRole    @default(STUDENT)
-  status        UserStatus  @default(PENDING) // Controle de ciclo de vida e sala de espera
+  status        UserStatus  @default(PENDING) // Controle global de onboarding inicial
   academicId    String?     // Matrícula / RA Unifesp
   phone         String?     // WhatsApp / Telefone de contato
   course        String?     // Curso / Programa de Pós-Graduação
@@ -119,7 +187,7 @@ model User {
   createdAt     DateTime    @default(now())
   updatedAt     DateTime    @updatedAt
 
-  // Auditoria da aprovação de membros
+  // Auditoria da aprovação global/legada de membros
   approvedById  String?
   approvedBy    User?       @relation("UserApprovals", fields: [approvedById], references: [id])
   approvedUsers User[]      @relation("UserApprovals")
@@ -128,6 +196,11 @@ model User {
   // Relações NextAuth
   accounts      Account[]
   sessions      Session[]
+
+  // Relações Multi-Tenant com Laboratórios
+  managedLaboratories     Laboratory[]    @relation("LabResponsible")
+  labMemberships          LabMembership[]
+  approvedLabMemberships  LabMembership[] @relation("LabMembershipApprover")
 
   // Relações com Workspaces
   requestedWorkspaces  Workspace[]          @relation("WorkspaceRequester")
@@ -154,11 +227,12 @@ model User {
 }
 
 // ==========================================
-// 4. ESPAÇOS DE TRABALHO (WORKSPACES)
+// 5. ESPAÇOS DE TRABALHO (WORKSPACES)
 // ==========================================
 
 model Workspace {
   id             String          @id @default(cuid())
+  labId          String          @default("lab-ctpp")
   name           String
   slug           String          @unique
   description    String?         @db.Text
@@ -177,6 +251,8 @@ model Workspace {
   createdAt      DateTime        @default(now())
   updatedAt      DateTime        @updatedAt
 
+  laboratory     Laboratory      @relation(fields: [labId], references: [id], onDelete: Cascade)
+
   // Filhos do Workspace
   members        WorkspaceMember[]
   columns        KanbanColumn[]
@@ -185,6 +261,7 @@ model Workspace {
   documents      Document[]
   timeEntries    TimeEntry[]
 
+  @@index([labId, status])
   @@index([status])
   @@index([requestedById])
   @@index([approvedById])
@@ -206,27 +283,31 @@ model WorkspaceMember {
 }
 
 // ==========================================
-// 5. KANBAN: COLUNAS, TAREFAS, TAGS E CHAT
+// 6. KANBAN: COLUNAS, TAREFAS, TAGS E CHAT
 // ==========================================
 
 model KanbanColumn {
-  id          String    @id @default(cuid())
+  id          String     @id @default(cuid())
+  labId       String     @default("lab-ctpp")
   workspaceId String
-  title       String    // Ex: "A Fazer", "Em Andamento", "Revisão", "Concluído"
-  order       Int       @default(0)
-  color       String?   // Código de cor hex ou classe tailwind para identificação
-  isDefault   Boolean   @default(false)
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
+  title       String     // Ex: "A Fazer", "Em Andamento", "Revisão", "Concluído"
+  order       Int        @default(0)
+  color       String?    // Código de cor hex ou classe tailwind para identificação
+  isDefault   Boolean    @default(false)
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
 
-  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  laboratory  Laboratory @relation(fields: [labId], references: [id], onDelete: Cascade)
+  workspace   Workspace  @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
   tasks       Task[]
 
+  @@index([labId, workspaceId, order])
   @@index([workspaceId, order])
 }
 
 model Task {
   id              String        @id @default(cuid())
+  labId           String        @default("lab-ctpp")
   workspaceId     String
   columnId        String
   title           String
@@ -243,6 +324,7 @@ model Task {
   createdAt       DateTime      @default(now())
   updatedAt       DateTime      @updatedAt
 
+  laboratory      Laboratory    @relation(fields: [labId], references: [id], onDelete: Cascade)
   workspace       Workspace     @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
   column          KanbanColumn  @relation(fields: [columnId], references: [id], onDelete: Cascade)
   
@@ -251,6 +333,8 @@ model Task {
   comments        TaskComment[]
   timeEntries     TimeEntry[]
 
+  @@index([labId, workspaceId, columnId])
+  @@index([labId, dueDate])
   @@index([workspaceId, columnId])
   @@index([dueDate])
   @@index([createdById])
@@ -270,16 +354,19 @@ model TaskAssignee {
 }
 
 model Tag {
-  id          String    @id @default(cuid())
+  id          String     @id @default(cuid())
+  labId       String     @default("lab-ctpp")
   workspaceId String
   name        String
-  color       String    @default("#0E4734") // Cor padrão do Lab CTPP
-  createdAt   DateTime  @default(now())
+  color       String     @default("#0E4734") // Cor padrão do Lab CTPP
+  createdAt   DateTime   @default(now())
 
-  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  laboratory  Laboratory @relation(fields: [labId], references: [id], onDelete: Cascade)
+  workspace   Workspace  @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
   tasks       TaskTag[]
 
   @@unique([workspaceId, name])
+  @@index([labId, workspaceId])
   @@index([workspaceId])
 }
 
@@ -311,11 +398,12 @@ model TaskComment {
 }
 
 // ==========================================
-// 6. APONTAMENTO DE HORAS (TIME TRACKING)
+// 7. APONTAMENTO DE HORAS (TIME TRACKING)
 // ==========================================
 
 model TimeEntry {
   id              String          @id @default(cuid())
+  labId           String          @default("lab-ctpp")
   taskId          String
   userId          String
   workspaceId     String
@@ -327,98 +415,115 @@ model TimeEntry {
   createdAt       DateTime        @default(now())
   updatedAt       DateTime        @updatedAt
 
+  laboratory      Laboratory      @relation(fields: [labId], references: [id], onDelete: Cascade)
   task            Task            @relation(fields: [taskId], references: [id], onDelete: Cascade)
   user            User            @relation(fields: [userId], references: [id], onDelete: Cascade)
   workspace       Workspace       @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
 
+  @@index([labId, userId, date])
+  @@index([labId, workspaceId, date])
   @@index([userId, date])
   @@index([workspaceId, date])
   @@index([taskId])
 }
 
 // ==========================================
-// 7. CADERNO DE ANOTAÇÕES (NOTION-LIKE / BLOCKNOTE)
+// 8. CADERNO DE ANOTAÇÕES (NOTION-LIKE / BLOCKNOTE)
 // ==========================================
 
 model Document {
-  id          String    @id @default(cuid())
-  title       String    @default("Sem título")
-  icon        String?   // Emoji ou identificador de ícone (ex: 🔬, 🧪, 📑)
+  id          String     @id @default(cuid())
+  labId       String     @default("lab-ctpp")
+  title       String     @default("Sem título")
+  icon        String?    // Emoji ou identificador de ícone (ex: 🔬, 🧪, 📑)
   coverImage  String?
-  content     Json?     // Blocos serializados (BlockNote / Tiptap JSON AST)
-  type        DocType   @default(PERSONAL)
-  isPublished Boolean   @default(false)
-  order       Int       @default(0)
+  content     Json?      // Blocos serializados (BlockNote / Tiptap JSON AST)
+  type        DocType    @default(PERSONAL)
+  isPublished Boolean    @default(false)
+  order       Int        @default(0)
 
   ownerId     String
-  owner       User      @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  owner       User       @relation(fields: [ownerId], references: [id], onDelete: Cascade)
 
-  workspaceId String?   // Obrigatório se type == WORKSPACE, nulo se PERSONAL
+  workspaceId String?    // Obrigatório se type == WORKSPACE, nulo se PERSONAL
   workspace   Workspace? @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  laboratory  Laboratory @relation(fields: [labId], references: [id], onDelete: Cascade)
 
   // Auto-relacionamento em árvore para subpáginas infinitas estilo Notion
   parentId    String?
-  parent      Document? @relation("DocumentTree", fields: [parentId], references: [id], onDelete: Cascade)
+  parent      Document?  @relation("DocumentTree", fields: [parentId], references: [id], onDelete: Cascade)
   children    Document[] @relation("DocumentTree")
 
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
 
+  @@index([labId, ownerId, type])
+  @@index([labId, workspaceId])
   @@index([ownerId, type])
   @@index([workspaceId])
   @@index([parentId])
 }
 
 // ==========================================
-// 8. CONFIGURAÇÕES DA PLATAFORMA (WHITE-LABEL)
+// 9. CONFIGURAÇÕES DA PLATAFORMA (WHITE-LABEL POR LAB)
 // ==========================================
 
 model PlatformSettings {
-  id              String   @id @default("default") // Chave única singleton
-  labName         String   @default("Lab CTPP")
-  institutionName String   @default("UNIFESP")
-  departmentName  String   @default("Living Lab Universitário")
-  primaryColor    String   @default("#0E4330")     // Hex da cor primária ("Lab" verde floresta)
-  secondaryColor  String   @default("#24576C")     // Hex da cor secundária ("CTPP" petróleo)
-  accentColor     String   @default("#1F8A64")     // Hex de destaque
-  fontColorLight  String?  @default("#111827")     // Hex da cor das fontes em modo claro
-  fontColorDark   String?  @default("#F8FAFC")     // Hex da cor das fontes em modo escuro
-  logoUrl         String?                          // URL ou caminho do logotipo
-  faviconUrl      String?                          // URL ou caminho do favicon
-  supportEmail    String?  @default("contato@labctpp.unifesp.br")
-  updatedAt       DateTime @updatedAt
+  id              String     @id @default(cuid())
+  labId           String     @unique @default("lab-ctpp")
+  labName         String     @default("Lab CTPP")
+  institutionName String     @default("UNIFESP")
+  departmentName  String     @default("Living Lab Universitário")
+  primaryColor    String     @default("#0E4330")     // Hex da cor primária ("Lab" verde floresta)
+  secondaryColor  String     @default("#24576C")     // Hex da cor secundária ("CTPP" petróleo)
+  accentColor     String     @default("#1F8A64")     // Hex de destaque
+  fontColorLight  String?    @default("#111827")     // Hex da cor das fontes em modo claro
+  fontColorDark   String?    @default("#F8FAFC")     // Hex da cor das fontes em modo escuro
+  logoUrl         String?                            // URL ou caminho do logotipo
+  faviconUrl      String?                            // URL ou caminho do favicon
+  supportEmail    String?    @default("contato@labctpp.unifesp.br")
+  updatedAt       DateTime   @updatedAt
+
+  laboratory      Laboratory @relation(fields: [labId], references: [id], onDelete: Cascade)
 }
 
 // ==========================================
-// 9. ATRIBUIÇÕES E PERMISSÕES DE ACESSO (RBAC DINÂMICO)
+// 10. ATRIBUIÇÕES E PERMISSÕES DE ACESSO (RBAC DINÂMICO POR LAB)
 // ==========================================
 
 model Attribution {
-  id          String   @id @default(cuid())
-  name        String   @unique
-  slug        String   @unique
-  description String?  @db.Text
-  color       String   @default("#0E4734")
-  permissions String[] // Permissões de módulos: "workspaces", "workspaces_admin", "time_tracking", "docs", "calendar", "members_view", "members_manage", "approvals", "platform_settings", "reports"
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  id          String     @id @default(cuid())
+  labId       String     @default("lab-ctpp")
+  name        String
+  slug        String
+  description String?    @db.Text
+  color       String     @default("#0E4734")
+  permissions String[]   // Permissões de módulos: "workspaces", "workspaces_admin", "time_tracking", "docs", "calendar", "members_view", "members_manage", "approvals", "platform_settings", "reports"
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
 
+  laboratory  Laboratory @relation(fields: [labId], references: [id], onDelete: Cascade)
   users       UserAttribution[]
 
-  @@index([slug])
+  @@unique([labId, name])
+  @@unique([labId, slug])
+  @@index([labId, slug])
 }
 
 model UserAttribution {
   id            String      @id @default(cuid())
+  labId         String      @default("lab-ctpp")
   userId        String
   attributionId String
   assignedAt    DateTime    @default(now())
 
+  laboratory    Laboratory  @relation(fields: [labId], references: [id], onDelete: Cascade)
   user          User        @relation(fields: [userId], references: [id], onDelete: Cascade)
   attribution   Attribution @relation(fields: [attributionId], references: [id], onDelete: Cascade)
 
   @@unique([userId, attributionId])
+  @@index([labId, userId])
   @@index([userId])
   @@index([attributionId])
 }
-

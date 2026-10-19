@@ -163,6 +163,20 @@ stateDiagram-v2
   - [x] Modal `EditMemberDialog` para alteração in-place da função institucional, status e seleção de múltiplas atribuições.
   - [x] Seeding de atribuições padrão do Living Lab (Coordenação & Gestão, Pesquisa & Desenvolvimento, Infraestrutura & TI, Comunicação & Mídia, Administrativo & Financeiro).
 
+### Fase 8: Arquitetura Multi-Tenant (Multi-Laboratórios em Endpoint Único)
+- [x] **Modelagem Relacional Multi-Tenant (`Laboratory` & `LabMembership`):**
+  - [x] Entidade `Laboratory` (Tenant raiz) com configurações White-label integradas e coordenador responsável (`responsibleId`).
+  - [x] Entidade `LabMembership` gerenciando o vínculo, papel (`PROFESSOR`, `LEADER`, `STUDENT`) e status (`WAITING_APPROVAL`, `ACTIVE`, `REJECTED`, `SUSPENDED`) individualmente por laboratório.
+  - [x] Adição da coluna discriminadora `labId` com índices compostos B-Tree (`@@index([labId, ...])`) nas entidades `Workspace`, `KanbanColumn`, `Task`, `Tag`, `TimeEntry`, `Document`, `Attribution`, `UserAttribution` e `PlatformSettings`.
+- [x] **Migração Idempotente Zero Data Loss (`scripts/migrate-multitenant.js`):**
+  - [x] Preservação integral de todos os registros existentes vinculando-os automaticamente ao laboratório inaugural **Lab CTPP (`lab-ctpp`)**.
+  - [x] Sincronização automática de `LabMembership` para todos os usuários já cadastrados sem perda de histórico.
+- [x] **Fluxo de Login, Seleção de Laboratório (`/labs`) e Triagem Descentralizada:**
+  - [x] Escolha do(s) laboratório(s) desejado(s) para triagem durante o `/onboarding` ou posteriormente pelo portal `/labs`.
+  - [x] Exibição pós-login de todos os laboratórios disponíveis para acesso (`/labs`) nos quais o usuário já foi homologado, além de seletor rápido na Sidebar.
+  - [x] Triagem e homologação de solicitações (`LabMembership` em `WAITING_APPROVAL`) acessível tanto pelo **Responsável do Laboratório (`PROFESSOR`)** quanto pelos **Líderes (`LEADER`)** daquele laboratório (`/admin/approvals` e Dashboard).
+  - [x] Isolamento de White-label (`PlatformSettings`) por laboratório ativo na sessão (`labgest_active_lab`).
+
 ---
 
 ## 5. Diretrizes Obrigatórias para a IA (System Prompting & Regras de Preservação)

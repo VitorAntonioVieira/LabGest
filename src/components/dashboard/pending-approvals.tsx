@@ -112,10 +112,10 @@ export function PendingApprovals({
               <ShieldCheck className="h-5 w-5 text-amber-600 dark:text-amber-400" />
               <div>
                 <CardTitle className="text-sm font-semibold text-amber-900 dark:text-amber-200">
-                  Painel da Coordenação: Solicitações Pendentes de Homologação
+                  Triagem do Laboratório: Solicitações Pendentes de Homologação
                 </CardTitle>
                 <CardDescription className="text-xs text-amber-800/80 dark:text-amber-300/80">
-                  Realize a triagem de novos integrantes e aprove a abertura de braços de pesquisa.
+                  Pedidos de triagem visíveis para o Responsável do Laboratório e Líderes. Homologue integrantes e aprove braços de pesquisa.
                 </CardDescription>
               </div>
             </div>

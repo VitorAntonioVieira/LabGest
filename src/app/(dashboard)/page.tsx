@@ -1,9 +1,8 @@
 import React from "react";
 import { redirect } from "next/navigation";
 import Link from "next/link";
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { getActiveLabContext } from "@/lib/lab-context";
 import {
   Clock,
   Layers,
@@ -11,6 +10,7 @@ import {
   BookOpen,
   Users,
   ArrowUpRight,
+  Building2,
 } from "lucide-react";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -19,28 +19,35 @@ import { Progress } from "@/components/ui/progress";
 import { PendingApprovals } from "@/components/dashboard/pending-approvals";
 import { DashboardInteractiveSections } from "@/components/dashboard/dashboard-interactive-sections";
 import { TimeEntryButton } from "@/components/dashboard/time-entry-button";
+import { ROLE_LABELS } from "@/types";
 
 export default async function DashboardPage() {
-  // 1. Verificação de Sessão do Usuário
-  const session = await getServerSession(authOptions);
+  // 1. Verificação de Sessão e Contexto Multi-Tenant do Laboratório Ativo
+  const {
+    user,
+    activeLab,
+    activeLabId,
+    roleInLab,
+    canApproveInLab,
+  } = await getActiveLabContext();
 
-  if (!session?.user?.id) {
+  if (!user) {
     redirect("/login");
   }
 
-  const userId = session.user.id;
-  const userRole = session.user.role;
-  const userName = session.user.name || "Integrante";
+  const userId = user.id;
+  const userName = user.name || "Integrante";
 
-  // 2. Busca de Dados Reais no Prisma
+  // 2. Busca de Dados Reais no Prisma filtrados por labId (Multi-Tenant Index Scan)
 
-  // A. Soma das horas cadastradas no mês atual pelo usuário
+  // A. Soma das horas cadastradas no mês atual pelo usuário neste laboratório
   const now = new Date();
   const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
   const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999);
 
   const monthlyEntries = await prisma.timeEntry.findMany({
     where: {
+      labId: activeLabId,
       userId: userId,
       date: {
         gte: startOfMonth,
@@ -57,16 +64,20 @@ export default async function DashboardPage() {
   const hoursGoal = 40;
   const monthlyProgress = Math.min(100, Math.round((totalMinutesThisMonth / (hoursGoal * 60)) * 100));
 
-  // B. Quantidade de tarefas no Kanban atribuídas a ele
+  // B. Quantidade de tarefas no Kanban atribuídas a ele neste laboratório
   const assignedTasksCount = await prisma.taskAssignee.count({
     where: {
       userId: userId,
+      task: {
+        labId: activeLabId,
+      },
     },
   });
 
-  // C. Lista de Workspaces (Braços de pesquisa) ativos
+  // C. Lista de Workspaces (Braços de pesquisa) ativos do laboratório
   const activeWorkspaces = await prisma.workspace.findMany({
     where: {
+      labId: activeLabId,
       status: "APPROVED",
     },
     include: {
@@ -83,12 +94,13 @@ export default async function DashboardPage() {
     },
   });
 
-  // D. Se for PROFESSOR, busca Workspaces com status PENDING e Usuários com status WAITING_APPROVAL
+  // D. Se for Responsável do Lab (PROFESSOR) ou Líder (LEADER), busca Workspaces PENDING e Pedidos de Triagem (LabMembership WAITING_APPROVAL)
   let pendingWorkspaces: any[] = [];
   let pendingUsers: any[] = [];
-  if (userRole === "PROFESSOR") {
+  if (canApproveInLab) {
     pendingWorkspaces = await prisma.workspace.findMany({
       where: {
+        labId: activeLabId,
         status: "PENDING",
       },
       include: {
@@ -105,29 +117,40 @@ export default async function DashboardPage() {
       },
     });
 
-    pendingUsers = await prisma.user.findMany({
+    const pendingMemberships = await prisma.labMembership.findMany({
       where: {
+        labId: activeLabId,
         status: "WAITING_APPROVAL",
       },
-      select: {
-        id: true,
-        name: true,
-        email: true,
-        image: true,
-        academicId: true,
-        phone: true,
-        course: true,
-        createdAt: true,
+      include: {
+        user: {
+          select: {
+            id: true,
+            name: true,
+            email: true,
+            image: true,
+            academicId: true,
+            phone: true,
+            course: true,
+            createdAt: true,
+          },
+        },
       },
       orderBy: {
         createdAt: "asc",
       },
     });
+
+    pendingUsers = pendingMemberships.map((m) => ({
+      ...m.user,
+      createdAt: m.createdAt,
+    }));
   }
 
-  // E. Lista dos últimos apontamentos de horas do usuário
+  // E. Lista dos últimos apontamentos de horas do usuário neste laboratório
   const recentEntriesRaw = await prisma.timeEntry.findMany({
     where: {
+      labId: activeLabId,
       userId: userId,
     },
     take: 5,
@@ -143,15 +166,16 @@ export default async function DashboardPage() {
   const recentEntries = recentEntriesRaw.map((entry) => ({
     id: entry.id,
     taskTitle: entry.task?.title || "Atividade de Pesquisa",
-    workspaceName: entry.workspace?.name || "Living Lab",
+    workspaceName: entry.workspace?.name || activeLab.name,
     date: entry.date.toLocaleDateString("pt-BR"),
     minutes: entry.durationMinutes,
     summary: entry.summary,
   }));
 
-  // F. Tarefas prioritárias (atribuídas ao usuário ou com allowSelfAssign ativo)
+  // F. Tarefas prioritárias do laboratório ativo
   const upcomingTasksRaw = await prisma.task.findMany({
     where: {
+      labId: activeLabId,
       OR: [
         { assignees: { some: { userId: userId } } },
         { allowSelfAssign: true },
@@ -177,9 +201,10 @@ export default async function DashboardPage() {
     tags: task.tags.map((t) => t.tag.name),
   }));
 
-  // G. Tarefas disponíveis para seleção no modal
+  // G. Tarefas disponíveis para seleção no modal neste laboratório
   const availableTasksForModalRaw = await prisma.task.findMany({
     where: {
+      labId: activeLabId,
       completedAt: null,
     },
     select: {
@@ -197,9 +222,10 @@ export default async function DashboardPage() {
     workspaceId: t.workspace.id,
   }));
 
-  // H. Documentos recentes
+  // H. Documentos recentes do laboratório ativo
   const recentDocsRaw = await prisma.document.findMany({
     where: {
+      labId: activeLabId,
       OR: [{ ownerId: userId }, { type: "WORKSPACE" }],
     },
     take: 3,
@@ -223,16 +249,17 @@ export default async function DashboardPage() {
 
   const totalDocumentsCount = await prisma.document.count({
     where: {
+      labId: activeLabId,
       OR: [{ ownerId: userId }, { type: "WORKSPACE" }],
     },
   });
 
   return (
     <div className="space-y-8">
-      {/* 1. Header de Boas-Vindas Acadêmico com Nome Real da Sessão */}
+      {/* 1. Header de Boas-Vindas Acadêmico com Nome Real da Sessão e Laboratório Ativo */}
       <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between border-b border-border pb-6">
         <div>
-          <div className="flex items-center gap-2.5">
+          <div className="flex flex-wrap items-center gap-2.5">
             <h1 className="text-2xl font-bold tracking-tight text-foreground sm:text-3xl">
               Olá, {userName}
             </h1>
@@ -240,11 +267,14 @@ export default async function DashboardPage() {
               variant="lab"
               className="text-xs px-2.5 py-0.5 border border-primary/20 font-semibold"
             >
-              {userRole === "PROFESSOR" ? "Administrador Geral" : userRole}
+              {ROLE_LABELS[roleInLab] || roleInLab}
             </Badge>
           </div>
-          <p className="text-sm text-muted-foreground mt-1">
-            Laboratório Vivo CTPP • UNIFESP | Período Letivo 2026.2
+          <p className="text-sm text-muted-foreground mt-1 flex items-center gap-1.5">
+            <Building2 className="h-3.5 w-3.5 text-primary shrink-0" />
+            <span>
+              <strong>{activeLab.name}</strong> • {activeLab.departmentName} ({activeLab.institutionName})
+            </span>
           </p>
         </div>
 
@@ -264,7 +294,7 @@ export default async function DashboardPage() {
         </div>
       </div>
 
-      {/* 2. Grid de Métricas Principais Calculadas do Prisma */}
+      {/* 2. Grid de Métricas Principais Calculadas do Prisma (Escopadas por Lab) */}
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         {/* Card 1: Horas no Mês */}
         <Card className="border border-border/80 shadow-xs hover:border-primary/40 transition-colors">
@@ -362,8 +392,8 @@ export default async function DashboardPage() {
         </Card>
       </div>
 
-      {/* 3. Módulo Especial RBAC: Triagem de Membros e Aprovação de Workspaces pelo Professor */}
-      {userRole === "PROFESSOR" && (pendingWorkspaces.length > 0 || pendingUsers.length > 0) && (
+      {/* 3. Módulo Especial RBAC Multi-Tenant: Triagem de Membros e Workspaces pelo Responsável (PROFESSOR) e Líderes (LEADER) */}
+      {canApproveInLab && (pendingWorkspaces.length > 0 || pendingUsers.length > 0) && (
         <PendingApprovals
           workspaces={pendingWorkspaces}
           pendingUsers={pendingUsers}
@@ -381,10 +411,10 @@ export default async function DashboardPage() {
           <div>
             <h2 className="text-lg font-bold text-foreground tracking-tight flex items-center gap-2">
               <FolderGit2 className="h-5 w-5 text-primary" />
-              Braços de Pesquisa (Workspaces Ativos)
+              Braços de Pesquisa ({activeLab.name})
             </h2>
             <p className="text-xs text-muted-foreground">
-              Cada espaço possui seu próprio fluxo Kanban e documentação colaborativa.
+              Cada espaço possui seu próprio fluxo Kanban e documentação colaborativa neste laboratório.
             </p>
           </div>
           <Link
@@ -398,7 +428,7 @@ export default async function DashboardPage() {
 
         {activeWorkspaces.length === 0 ? (
           <Card className="border-dashed p-6 text-center text-xs text-muted-foreground">
-            Nenhum braço de pesquisa ativo no momento. Solicite a abertura de um novo espaço de trabalho!
+            Nenhum braço de pesquisa ativo no momento neste laboratório. Solicite a abertura de um novo espaço de trabalho!
           </Card>
         ) : (
           <div className="grid gap-4 sm:grid-cols-2">
@@ -449,7 +479,6 @@ export default async function DashboardPage() {
                     </div>
                   </CardContent>
                   <CardFooter className="pt-0 flex gap-2">
-                    {/* Rotas dinâmicas conforme solicitado */}
                     <Button
                       asChild
                       variant="outline"

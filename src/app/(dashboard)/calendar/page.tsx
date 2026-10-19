@@ -1,18 +1,18 @@
 import React from "react";
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import { Calendar as CalendarIcon, Clock, MapPin, Users, Plus, CheckCircle2 } from "lucide-react";
+import { getActiveLabContext } from "@/lib/lab-context";
+import { Calendar as CalendarIcon, Clock, Plus } from "lucide-react";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 
 export default async function CalendarPage() {
-  const session = await getServerSession(authOptions);
+  const { activeLab, activeLabId } = await getActiveLabContext();
 
-  // Busca tarefas com dueDate configurada
+  // Busca tarefas com dueDate configurada neste laboratório
   const tasksWithDueDate = await prisma.task.findMany({
     where: {
+      labId: activeLabId,
       dueDate: { not: null },
     },
     include: {
@@ -30,12 +30,12 @@ export default async function CalendarPage() {
         <div>
           <div className="flex items-center gap-2 mb-1">
             <Badge variant="lab" className="text-xs">
-              Cronograma Acadêmico
+              {activeLab.name} • Cronograma Acadêmico
             </Badge>
           </div>
           <h1 className="text-2xl font-bold tracking-tight text-foreground sm:text-3xl flex items-center gap-2.5">
             <CalendarIcon className="h-7 w-7 text-primary" />
-            Calendário do Living Lab
+            Calendário do {activeLab.name}
           </h1>
           <p className="text-sm text-muted-foreground mt-1">
             Acompanhe entregas, reuniões de bancas, prazos de relatórios científicos e seminários de pesquisa.
@@ -66,7 +66,7 @@ export default async function CalendarPage() {
             <CardContent>
               {tasksWithDueDate.length === 0 ? (
                 <div className="p-8 text-center border border-dashed rounded-lg text-xs text-muted-foreground">
-                  Nenhum prazo cadastrado para as próximas semanas.
+                  Nenhum prazo cadastrado para as próximas semanas neste laboratório.
                 </div>
               ) : (
                 <div className="space-y-3">
@@ -110,7 +110,7 @@ export default async function CalendarPage() {
                 Seminários & Atividades Fixas
               </CardTitle>
               <CardDescription className="text-xs">
-                Reuniões gerais do Living Lab CTPP
+                Reuniões gerais do {activeLab.name}
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-3 text-xs">

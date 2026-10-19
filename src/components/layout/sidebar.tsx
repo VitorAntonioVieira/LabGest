@@ -1,12 +1,11 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useTransition } from "react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { signOut, useSession } from "next-auth/react";
 import {
   LayoutDashboard,
-  KanbanSquare,
   Calendar,
   BookOpen,
   Clock,
@@ -14,16 +13,18 @@ import {
   PlusCircle,
   FolderGit2,
   ChevronRight,
-  Sparkles,
   Sliders,
   LogOut,
   Users,
+  Building2,
+  ArrowLeftRight,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { RequestWorkspaceDialog } from "@/components/modals/request-workspace-dialog";
+import { selectActiveLaboratory } from "@/app/actions";
 import type { UserRole } from "@/types";
 
 interface SidebarProps {
@@ -33,6 +34,14 @@ interface SidebarProps {
     role: UserRole;
     avatarUrl?: string;
   };
+  activeLabId?: string;
+  approvedLabs?: {
+    id: string;
+    name: string;
+    slug: string;
+    primaryColor: string;
+    role?: UserRole | null;
+  }[];
   workspaces?: {
     id: string;
     name: string;
@@ -50,21 +59,40 @@ interface SidebarProps {
 
 export function Sidebar({
   currentUser,
+  activeLabId,
+  approvedLabs = [],
   workspaces = [],
   activeWorkspacesCount = 0,
   pendingApprovalsCount = 0,
   brandSettings,
 }: SidebarProps) {
   const pathname = usePathname();
+  const router = useRouter();
   const { data: session } = useSession();
   const [isRequestWsOpen, setIsRequestWsOpen] = useState(false);
+  const [isSwitchingLab, startTransition] = useTransition();
 
-  // Usuário 100% dinâmico (prioriza SSR e fallback reativo para useSession)
+  // Usuário 100% dinâmico (prioriza papel no laboratório ativo via SSR)
   const user = {
     name: currentUser?.name || session?.user?.name || "Integrante UNIFESP",
     email: currentUser?.email || session?.user?.email || "",
     role: (currentUser?.role || session?.user?.role || "STUDENT") as UserRole,
     avatarUrl: currentUser?.avatarUrl || session?.user?.image || undefined,
+  };
+
+  const canApproveInLab = user.role === "PROFESSOR" || user.role === "LEADER";
+  const canManageWhiteLabel = user.role === "PROFESSOR";
+
+  const handleQuickLabSwitch = (newLabId: string) => {
+    if (newLabId === activeLabId) return;
+    startTransition(async () => {
+      try {
+        await selectActiveLaboratory(newLabId);
+        router.refresh();
+      } catch (err) {
+        console.error(err);
+      }
+    });
   };
 
   const navItems = [
@@ -104,25 +132,26 @@ export function Sidebar({
 
   const adminItems = [
     {
-      title: "Aprovações & Gestão",
+      title: "Aprovações & Triagem",
       href: "/admin/approvals",
       icon: ShieldCheck,
       badge: pendingApprovalsCount > 0 ? `${pendingApprovalsCount} Pendente` : undefined,
       isAlert: pendingApprovalsCount > 0,
+      visible: canApproveInLab,
     },
     {
       title: "Configurações White-label",
       href: "/admin/settings",
       icon: Sliders,
+      visible: canManageWhiteLabel,
     },
-  ];
+  ].filter((item) => item.visible);
 
   return (
     <aside className="h-full w-64 shrink-0 flex flex-col border-r border-border bg-card/95 backdrop-blur z-30 transition-all duration-300">
-      {/* 1. Header do Logo Lab CTPP */}
+      {/* 1. Header do Logo White-label do Laboratório Ativo */}
       <div className="flex h-16 items-center justify-between border-b border-border px-5">
         <Link href="/" className="flex items-center gap-2.5 group overflow-hidden">
-          {/* Logotipo Customizado ou Símbolo Padrão */}
           {brandSettings?.logoUrl ? (
             <div className="relative flex h-9 w-9 items-center justify-center rounded-lg border border-border/60 bg-muted/20 p-1 shadow-xs transition-transform group-hover:scale-105 shrink-0 overflow-hidden">
               <img
@@ -142,7 +171,6 @@ export function Sidebar({
                 strokeLinecap="round"
                 strokeLinejoin="round"
               >
-                {/* Folhas e livro combinados */}
                 <path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H20v20H6.5a2.5 2.5 0 0 1-2.5-2.5Z" />
                 <path d="M6 6h10" />
                 <path d="M6 10h10" />
@@ -161,6 +189,43 @@ export function Sidebar({
               {brandSettings?.departmentName || "Living Lab"} • {brandSettings?.institutionName || "UNIFESP"}
             </span>
           </div>
+        </Link>
+      </div>
+
+      {/* Seletor Multi-Tenant de Laboratório & Acesso ao Hub /labs */}
+      <div className="px-3 pt-3 pb-1 space-y-1.5 border-b border-border/60">
+        {approvedLabs.length > 1 && (
+          <div className="space-y-1">
+            <label className="px-1 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-1">
+              <Building2 className="h-3 w-3 text-primary" />
+              Laboratório Ativo
+            </label>
+            <select
+              value={activeLabId}
+              disabled={isSwitchingLab}
+              onChange={(e) => handleQuickLabSwitch(e.target.value)}
+              className="w-full h-8 rounded-md border border-border bg-muted/40 px-2.5 text-xs font-semibold text-foreground focus:outline-none focus:ring-1 focus:ring-primary cursor-pointer"
+            >
+              {approvedLabs.map((l) => (
+                <option key={l.id} value={l.id}>
+                  {l.name}
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
+
+        <Link
+          href="/labs"
+          className="flex items-center justify-between rounded-md px-2.5 py-1.5 text-[11px] font-medium text-muted-foreground hover:bg-accent hover:text-foreground transition-colors"
+        >
+          <span className="flex items-center gap-1.5">
+            <ArrowLeftRight className="h-3 w-3 text-primary" />
+            Trocar / Ver Laboratórios
+          </span>
+          <Badge variant="outline" className="text-[9px] px-1.5 py-0 h-4">
+            {approvedLabs.length || 1} Lab(s)
+          </Badge>
         </Link>
       </div>
 
@@ -224,11 +289,11 @@ export function Sidebar({
           })}
         </div>
 
-        {/* 4. Módulo Restrito ao Professor (RBAC Dinâmico) */}
-        {user.role === "PROFESSOR" && (
+        {/* 4. Módulo de Coordenação e Liderança do Laboratório (Responsável PROFESSOR + Líderes LEADER) */}
+        {canApproveInLab && adminItems.length > 0 && (
           <div className="space-y-1 border-t border-border pt-4">
             <p className="px-3 text-[11px] font-semibold text-primary dark:text-emerald-400 uppercase tracking-wider flex items-center justify-between">
-              <span>Coordenação Geral</span>
+              <span>{user.role === "PROFESSOR" ? "Coordenação do Lab" : "Liderança do Lab"}</span>
               <ShieldCheck className="h-3.5 w-3.5 text-primary dark:text-emerald-400" />
             </p>
             {adminItems.map((item) => {
@@ -348,7 +413,7 @@ export function Sidebar({
                     : "Integrante"}
                 </Badge>
                 <span className="truncate text-[10px] text-muted-foreground">
-                  UNIFESP
+                  {brandSettings?.institutionName || "UNIFESP"}
                 </span>
               </div>
             </div>

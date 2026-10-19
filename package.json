@@ -11,6 +11,7 @@
     "prisma:migrate": "prisma migrate dev",
     "prisma:studio": "prisma studio",
     "db:push": "prisma db push",
+    "db:migrate-multitenant": "node scripts/migrate-multitenant.js --pre && prisma db push --accept-data-loss && node scripts/migrate-multitenant.js",
     "db:seed": "npx tsx prisma/seed.ts",
     "db:cleanup-mocks": "node scripts/cleanup-mock-users.js"
   },

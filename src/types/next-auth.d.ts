@@ -7,6 +7,9 @@ declare module "next-auth" {
       id: string;
       role: UserRole;
       status: UserStatus;
+      hasActiveLab?: boolean;
+      hasWaitingLab?: boolean;
+      approvedLabCount?: number;
     } & DefaultSession["user"];
   }
 
@@ -14,6 +17,9 @@ declare module "next-auth" {
     id: string;
     role?: UserRole;
     status?: UserStatus;
+    hasActiveLab?: boolean;
+    hasWaitingLab?: boolean;
+    approvedLabCount?: number;
   }
 }
 
@@ -22,5 +28,8 @@ declare module "next-auth/jwt" {
     id?: string;
     role?: UserRole;
     status?: UserStatus;
+    hasActiveLab?: boolean;
+    hasWaitingLab?: boolean;
+    approvedLabCount?: number;
   }
 }

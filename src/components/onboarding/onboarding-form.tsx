@@ -16,14 +16,16 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import {
-  Sparkles,
   Loader2,
   GraduationCap,
   Phone,
   Hash,
   LogOut,
   CheckCircle2,
+  Building2,
+  ShieldCheck,
 } from "lucide-react";
+import type { LaboratorySummary } from "@/types";
 
 interface OnboardingFormProps {
   user: {
@@ -36,15 +38,25 @@ interface OnboardingFormProps {
     phone: string | null;
     course: string | null;
   };
+  laboratories?: LaboratorySummary[];
 }
 
-export function OnboardingForm({ user }: OnboardingFormProps) {
+export function OnboardingForm({ user, laboratories = [] }: OnboardingFormProps) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const [academicId, setAcademicId] = useState(user.academicId || "");
   const [phone, setPhone] = useState(user.phone || "");
   const [course, setCourse] = useState(user.course || "");
+  const [selectedLabIds, setSelectedLabIds] = useState<string[]>(
+    laboratories.length > 0 ? [laboratories[0].id] : ["lab-ctpp"]
+  );
   const [error, setError] = useState<string | null>(null);
+
+  const toggleLabSelection = (labId: string) => {
+    setSelectedLabIds((prev) =>
+      prev.includes(labId) ? prev.filter((id) => id !== labId) : [...prev, labId]
+    );
+  };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -60,17 +72,23 @@ export function OnboardingForm({ user }: OnboardingFormProps) {
       return;
     }
 
+    if (selectedLabIds.length === 0) {
+      setError("Selecione ao menos um laboratório para enviar sua solicitação de triagem.");
+      return;
+    }
+
     startTransition(async () => {
       try {
         await completeOnboarding({
           academicId,
           phone,
           course: course.trim() || undefined,
+          labIds: selectedLabIds,
         });
         router.push("/waiting-room");
         router.refresh();
       } catch (err: any) {
-        setError(err.message || "Erro ao enviar solicitação.");
+        setError(err.message || "Erro ao enviar solicitação de triagem.");
       }
     });
   };
@@ -83,18 +101,18 @@ export function OnboardingForm({ user }: OnboardingFormProps) {
         </div>
 
         <div className="flex items-center justify-center font-bold tracking-tight text-xl leading-none">
-          <span className="text-primary font-black">Lab</span>
-          <span className="text-secondary ml-1 font-extrabold">CTPP</span>
+          <span className="text-primary font-black">LabGest</span>
+          <span className="text-secondary ml-1 font-extrabold">UNIFESP</span>
         </div>
         <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-widest mt-1">
-          Living Lab • UNIFESP
+          Plataforma Multi-Laboratórios • UNIFESP
         </p>
 
         <CardTitle className="text-lg font-bold text-foreground mt-3">
-          Completar Perfil de Integrante
+          Cadastro Acadêmico & Escolha de Laboratório
         </CardTitle>
-        <CardDescription className="text-xs max-w-sm mx-auto mt-1">
-          Informe seus dados acadêmicos para que a Coordenação do Lab homologue sua entrada e vincule você aos braços e projetos.
+        <CardDescription className="text-xs max-w-md mx-auto mt-1">
+          Escolha para qual laboratório deseja realizar a triagem e preencha seus dados. O pedido será enviado ao Responsável do laboratório e aos Líderes para aprovação.
         </CardDescription>
       </CardHeader>
 
@@ -113,12 +131,79 @@ export function OnboardingForm({ user }: OnboardingFormProps) {
               <span className="font-semibold text-foreground">{user.name || "Integrante"}</span>
             </div>
             <div className="flex items-center justify-between">
-              <span className="text-[11px] text-muted-foreground">E-mail:</span>
+              <span className="text-[11px] text-muted-foreground">E-mail Institucional:</span>
               <span className="font-mono text-[11px] text-primary">{user.email}</span>
             </div>
           </div>
 
-          {/* RA */}
+          {/* 1. Escolha do(s) Laboratório(s) para Triagem */}
+          <div className="space-y-2">
+            <label className="text-xs font-semibold text-foreground flex items-center justify-between">
+              <span className="flex items-center gap-1.5">
+                <Building2 className="h-3.5 w-3.5 text-primary" />
+                Para qual laboratório deseja fazer a triagem? *
+              </span>
+              <Badge variant="outline" className="text-[10px]">
+                {selectedLabIds.length} selecionado(s)
+              </Badge>
+            </label>
+
+            <div className="space-y-2 max-h-52 overflow-y-auto pr-1">
+              {laboratories.map((lab) => {
+                const isSelected = selectedLabIds.includes(lab.id);
+                return (
+                  <div
+                    key={lab.id}
+                    onClick={() => toggleLabSelection(lab.id)}
+                    className={`flex items-start justify-between gap-3 rounded-xl border p-3 cursor-pointer transition-all ${
+                      isSelected
+                        ? "border-primary bg-primary/5 ring-1 ring-primary/30"
+                        : "border-border/80 bg-card hover:bg-muted/40"
+                    }`}
+                  >
+                    <div className="flex items-start gap-2.5">
+                      <input
+                        type="checkbox"
+                        checked={isSelected}
+                        onChange={() => {}}
+                        className="mt-1 h-4 w-4 rounded border-input accent-primary"
+                      />
+                      <div className="space-y-0.5">
+                        <div className="flex items-center gap-2">
+                          <span
+                            className="inline-block h-2.5 w-2.5 rounded-full shrink-0"
+                            style={{ backgroundColor: lab.primaryColor }}
+                          />
+                          <span className="text-xs font-bold text-foreground">
+                            {lab.name}
+                          </span>
+                          <span className="text-[10px] text-muted-foreground">
+                            ({lab.departmentName})
+                          </span>
+                        </div>
+                        {lab.description && (
+                          <p className="text-[11px] text-muted-foreground line-clamp-1">
+                            {lab.description}
+                          </p>
+                        )}
+                        {lab.responsible && (
+                          <p className="text-[10px] text-muted-foreground flex items-center gap-1 pt-0.5">
+                            <ShieldCheck className="h-3 w-3 text-primary" />
+                            Responsável: <strong>{lab.responsible.name || lab.responsible.email}</strong>
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+            <p className="text-[10px] text-muted-foreground">
+              Sua solicitação chegará diretamente para o Professor Responsável e para os Líderes do laboratório escolhido.
+            </p>
+          </div>
+
+          {/* 2. RA */}
           <div className="space-y-1.5">
             <label
               htmlFor="academicId"
@@ -135,12 +220,9 @@ export function OnboardingForm({ user }: OnboardingFormProps) {
               required
               className="h-9 text-xs"
             />
-            <p className="text-[10px] text-muted-foreground">
-              Seu RA institucional da UNIFESP para validação de vínculo acadêmico.
-            </p>
           </div>
 
-          {/* WhatsApp / Telefone */}
+          {/* 3. WhatsApp / Telefone */}
           <div className="space-y-1.5">
             <label
               htmlFor="phone"
@@ -157,12 +239,9 @@ export function OnboardingForm({ user }: OnboardingFormProps) {
               required
               className="h-9 text-xs"
             />
-            <p className="text-[10px] text-muted-foreground">
-              Utilizado para comunicação direta e grupos operacionais do laboratório.
-            </p>
           </div>
 
-          {/* Curso */}
+          {/* 4. Curso */}
           <div className="space-y-1.5">
             <label
               htmlFor="course"
@@ -192,7 +271,7 @@ export function OnboardingForm({ user }: OnboardingFormProps) {
             ) : (
               <CheckCircle2 className="h-4 w-4" />
             )}
-            <span>Enviar Solicitação para Triagem</span>
+            <span>Enviar Solicitação de Triagem ao Laboratório</span>
           </Button>
 
           <Button

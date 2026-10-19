@@ -12,6 +12,32 @@ export type TimeEntryStatus = "PENDING" | "APPROVED" | "REJECTED";
 
 export type DocType = "WORKSPACE" | "PERSONAL";
 
+export interface LaboratorySummary {
+  id: string;
+  name: string;
+  slug: string;
+  description?: string | null;
+  institutionName: string;
+  departmentName: string;
+  primaryColor: string;
+  secondaryColor: string;
+  accentColor: string;
+  logoUrl?: string | null;
+  faviconUrl?: string | null;
+  supportEmail?: string | null;
+  responsible?: {
+    id: string;
+    name: string | null;
+    email: string | null;
+  } | null;
+  membershipRole?: UserRole | null;
+  membershipStatus?: UserStatus | null;
+  _count?: {
+    memberships: number;
+    workspaces: number;
+  };
+}
+
 export interface UserSession {
   id: string;
   name: string;
@@ -20,10 +46,14 @@ export interface UserSession {
   role: UserRole;
   status: UserStatus;
   academicId?: string;
+  activeLabId?: string;
+  hasActiveLab?: boolean;
+  hasWaitingLab?: boolean;
 }
 
 export interface WorkspaceSummary {
   id: string;
+  labId?: string;
   name: string;
   slug: string;
   description?: string | null;
@@ -157,6 +187,7 @@ export const SYSTEM_PERMISSIONS: SystemPermissionDef[] = [
 
 export interface AttributionSummary {
   id: string;
+  labId?: string;
   name: string;
   slug: string;
   description?: string | null;
@@ -193,4 +224,3 @@ export const ROLE_LABELS: Record<UserRole, string> = {
   LEADER: "Líder (Gestão)",
   STUDENT: "Integrante",
 };
-
