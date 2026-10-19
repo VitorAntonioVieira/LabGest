@@ -10,18 +10,17 @@ services:
       POSTGRES_USER: ${POSTGRES_USER:-labgest_admin}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-labgest_secure_password}
       POSTGRES_DB: ${POSTGRES_DB:-labgest_db}
-    ports:
-      - "5432:5432"
+    # Removido para evitar conflito com outros projetos na EC2.
+    # ports:
+    #   - "5432:5432"
     volumes:
       - ${DB_DATA_PATH:-~/.labgest/db_data}:/var/lib/postgresql/data
-
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-labgest_admin} -d ${POSTGRES_DB:-labgest_db}"]
       interval: 10s
       timeout: 5s
       retries: 5
-    networks:
-      - labgest-network
+    # Removido "networks: - labgest-network"
 
   # ==========================================
   # Aplicação Web: Next.js + Prisma
@@ -43,32 +42,13 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
-    networks:
-      - labgest-network
+    # Removido "networks: - labgest-network"
     expose:
       - "3000"
-    command: sh -c "npx prisma db push --skip-generate && node scripts/cleanup-mock-users.js && npm start"
+    command: sh -c "node scripts/migrate-multitenant.js --pre && npx prisma db push --skip-generate --accept-data-loss && node scripts/migrate-multitenant.js && node scripts/cleanup-mock-users.js && npm start"
 
-  caddy:
-    image: caddy:2-alpine
-    container_name: labgest_caddy
-    restart: always
-    ports:
-      - "80:80"
-      - "443:443"
-    volumes:
-      - ./Caddyfile:/etc/caddy/Caddyfile
-      - caddy_data:/data
-      - caddy_config:/config
-    depends_on:
-      - web
-    networks:
-      - labgest-network
-
-volumes:
-  caddy_data:
-  caddy_config:
-
+# A rede default fará com que todos os serviços entrem na proxy-network
 networks:
-  labgest-network:
-    driver: bridge
+  default:
+    name: proxy-network
+    external: true

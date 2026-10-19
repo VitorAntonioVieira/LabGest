@@ -1,3 +1,0 @@
-labtechpp.duckdns.org {
-    reverse_proxy web:3000
-}
