@@ -100,33 +100,39 @@ export function Sidebar({
       title: "Visão Geral",
       href: "/",
       icon: LayoutDashboard,
+      tourId: "nav-overview",
     },
     {
       title: "Espaços de Trabalho",
       href: "/workspaces",
       icon: FolderGit2,
       badge: activeWorkspacesCount > 0 ? `${activeWorkspacesCount} Ativos` : undefined,
+      tourId: "nav-workspaces",
     },
     {
       title: "Integrantes",
       href: "/members",
       icon: Users,
+      tourId: "nav-members",
     },
     {
       title: "Calendário do Lab",
       href: "/calendar",
       icon: Calendar,
+      tourId: "nav-calendar",
     },
     {
       title: "Caderno Pessoal",
       href: "/docs",
       icon: BookOpen,
       badge: "Notion",
+      tourId: "nav-docs",
     },
     {
       title: "Apontamento de Horas",
       href: "/time-tracking",
       icon: Clock,
+      tourId: "nav-timetracking",
     },
   ];
 
@@ -138,12 +144,14 @@ export function Sidebar({
       badge: pendingApprovalsCount > 0 ? `${pendingApprovalsCount} Pendente` : undefined,
       isAlert: pendingApprovalsCount > 0,
       visible: canApproveInLab,
+      tourId: "nav-approvals",
     },
     {
-      title: "Configurações White-label",
+      title: "Personalização do Lab",
       href: "/admin/settings",
       icon: Sliders,
       visible: canManageWhiteLabel,
+      tourId: "nav-settings",
     },
   ].filter((item) => item.visible);
 
@@ -192,8 +200,8 @@ export function Sidebar({
         </Link>
       </div>
 
-      {/* Seletor Multi-Tenant de Laboratório & Acesso ao Hub /labs */}
-      <div className="px-3 pt-3 pb-1 space-y-1.5 border-b border-border/60">
+      {/* Seletor de Laboratório & Acesso ao Hub /labs */}
+      <div data-tour="lab-switcher" className="px-3 pt-3 pb-1 space-y-1.5 border-b border-border/60">
         {approvedLabs.length > 1 && (
           <div className="space-y-1">
             <label className="px-1 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-1">
@@ -230,7 +238,7 @@ export function Sidebar({
       </div>
 
       {/* 2. Botão de Ação Rápida */}
-      <div className="p-3">
+      <div data-tour="request-workspace" className="p-3">
         <Button
           size="sm"
           onClick={() => setIsRequestWsOpen(true)}
@@ -253,6 +261,7 @@ export function Sidebar({
               <Link
                 key={item.href}
                 href={item.href}
+                data-tour={item.tourId}
                 className={cn(
                   "flex items-center justify-between rounded-lg px-3 py-2 text-sm font-medium transition-all group",
                   isActive
@@ -302,6 +311,7 @@ export function Sidebar({
                 <Link
                   key={item.href}
                   href={item.href}
+                  data-tour={item.tourId}
                   className={cn(
                     "flex items-center justify-between rounded-lg px-3 py-2 text-sm font-medium transition-all group",
                     isActive
@@ -328,7 +338,7 @@ export function Sidebar({
         )}
 
         {/* 5. Braços de Pesquisa Ativos Dinâmicos */}
-        <div className="space-y-1 border-t border-border pt-4">
+        <div data-tour="sidebar-workspaces-list" className="space-y-1 border-t border-border pt-4">
           <div className="flex items-center justify-between px-3">
             <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">
               Braços do Lab

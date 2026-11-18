@@ -278,7 +278,7 @@ export default async function DashboardPage() {
           </p>
         </div>
 
-        <div className="flex items-center gap-3">
+        <div data-tour="dashboard-quick-actions" className="flex items-center gap-3">
           <Button
             asChild
             variant="outline"
@@ -295,7 +295,7 @@ export default async function DashboardPage() {
       </div>
 
       {/* 2. Grid de Métricas Principais Calculadas do Prisma (Escopadas por Lab) */}
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      <div data-tour="dashboard-metrics" className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         {/* Card 1: Horas no Mês */}
         <Card className="border border-border/80 shadow-xs hover:border-primary/40 transition-colors">
           <CardHeader className="flex flex-row items-center justify-between pb-2">
@@ -406,7 +406,7 @@ export default async function DashboardPage() {
       )}
 
       {/* 4. Braços de Pesquisa Ativos com Rotas Dinâmicas /workspace/[id]/kanban e docs */}
-      <section className="space-y-4">
+      <section data-tour="dashboard-workspaces" className="space-y-4">
         <div className="flex items-center justify-between">
           <div>
             <h2 className="text-lg font-bold text-foreground tracking-tight flex items-center gap-2">

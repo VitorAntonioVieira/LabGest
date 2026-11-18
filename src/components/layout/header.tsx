@@ -44,15 +44,16 @@ export function Header() {
 
         {/* 2. Ações Rápidas */}
         <div className="flex items-center gap-3">
-          {/* Guia Interativo / Wizard da Plataforma */}
+          {/* Guia Interativo da Plataforma */}
           <button
             type="button"
+            data-tour="header-tour-btn"
             onClick={openTourWizard}
             className="flex items-center gap-1.5 rounded-lg border border-primary/25 bg-primary/10 px-2.5 py-1.5 text-xs font-semibold text-primary hover:bg-primary/20 transition-colors"
-            title="Abrir Guia Interativo das Ferramentas (Tour)"
+            title="Ver tour pela plataforma"
           >
             <Compass className="h-3.5 w-3.5" />
-            <span className="hidden sm:inline">Guia da Plataforma</span>
+            <span className="hidden sm:inline">Tour Guiado</span>
           </button>
 
           {/* Notificações */}

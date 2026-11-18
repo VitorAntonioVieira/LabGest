@@ -35,11 +35,9 @@ import {
   Send,
   X,
   Palette,
-  Compass,
 } from "lucide-react";
 import type { LaboratorySummary, UserRole } from "@/types";
 import { ROLE_LABELS } from "@/types";
-import { PlatformTourWizard } from "@/components/onboarding/platform-tour-wizard";
 
 interface LabSelectorClientProps {
   user: {
@@ -48,7 +46,6 @@ interface LabSelectorClientProps {
     email: string | null;
     image: string | null;
     role: UserRole;
-    hasCompletedTour?: boolean;
   };
   activeLabId: string;
   laboratories: LaboratorySummary[];
@@ -165,14 +162,11 @@ export function LabSelectorClient({
             <div>
               <div className="flex items-center gap-2">
                 <h1 className="text-xl font-bold tracking-tight text-foreground">
-                  Portal Multi-Laboratórios • LabGest UNIFESP
+                  Laboratórios • LabGest UNIFESP
                 </h1>
-                <Badge variant="lab" className="text-[10px]">
-                  Multi-Tenant
-                </Badge>
               </div>
               <p className="text-xs text-muted-foreground mt-0.5">
-                Selecione um laboratório homologado para acessar ou solicite triagem em novos laboratórios.
+                Escolha um laboratório para entrar ou solicite acesso para participar de outro laboratório.
               </p>
             </div>
           </div>
@@ -200,17 +194,6 @@ export function LabSelectorClient({
                 </p>
               </div>
             </div>
-
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              onClick={() => window.dispatchEvent(new CustomEvent("labgest:open-tour"))}
-              className="text-xs h-9 gap-1.5 font-semibold border-primary/30 text-primary hover:bg-primary/10"
-            >
-              <Compass className="h-3.5 w-3.5" />
-              <span>Guia da Plataforma</span>
-            </Button>
 
             {user.role === "PROFESSOR" && (
               <Button
@@ -276,16 +259,13 @@ export function LabSelectorClient({
                   <Sparkles className="h-5 w-5 text-primary" />
                   <div>
                     <CardTitle className="text-base font-bold text-foreground">
-                      Cadastrar Novo Laboratório (Tenant)
+                      Cadastrar Novo Laboratório
                     </CardTitle>
                     <CardDescription className="text-xs">
-                      O novo laboratório será servido neste mesmo endpoint com isolamento de dados e identidade White-label própria.
+                      Preencha os dados básicos e escolha as cores que identificam o laboratório.
                     </CardDescription>
                   </div>
                 </div>
-                <Badge variant="lab" className="text-[10px]">
-                  White-label Individual
-                </Badge>
               </div>
             </CardHeader>
             <form onSubmit={handleCreateLab}>
@@ -330,7 +310,7 @@ export function LabSelectorClient({
                 <div className="space-y-1.5">
                   <label className="text-xs font-semibold text-foreground flex items-center gap-1.5">
                     <Palette className="h-3.5 w-3.5 text-primary" />
-                    Cores White-label (Primária & Secundária)
+                    Cores do Laboratório (Principal & Secundária)
                   </label>
                   <div className="flex items-center gap-3">
                     <label className="flex items-center gap-1.5 text-xs text-muted-foreground">
@@ -404,7 +384,7 @@ export function LabSelectorClient({
                 Laboratórios Disponíveis para Acesso ({approvedLabs.length})
               </h2>
               <p className="text-xs text-muted-foreground">
-                Você já possui vínculo aprovado nestes laboratórios. Clique para carregar o ambiente e o tema White-label correspondente.
+                Você já faz parte destes laboratórios. Clique em um deles para entrar.
               </p>
             </div>
           </div>
@@ -669,15 +649,6 @@ export function LabSelectorClient({
           </section>
         )}
       </div>
-
-      {/* Wizard Interativo de Boas-Vindas no Primeiro Login */}
-      <PlatformTourWizard
-        userId={user.id}
-        userName={user.name || "Integrante UNIFESP"}
-        userRole={user.role}
-        labName="LabGest UNIFESP"
-        hasCompletedTour={Boolean(user.hasCompletedTour)}
-      />
     </div>
   );
 }
