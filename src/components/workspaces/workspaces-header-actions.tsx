@@ -11,6 +11,7 @@ export function WorkspacesHeaderActions() {
   return (
     <>
       <Button
+        data-tour="workspaces-request-btn"
         onClick={() => setIsOpen(true)}
         className="bg-primary text-primary-foreground hover:bg-primary/90 text-xs font-semibold gap-1.5 shadow-xs cursor-pointer"
       >

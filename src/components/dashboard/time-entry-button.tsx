@@ -20,6 +20,7 @@ export function TimeEntryButton({ tasks = [] }: TimeEntryButtonProps) {
   return (
     <>
       <Button
+        data-tour="timetracking-log-btn"
         onClick={() => setIsOpen(true)}
         className="bg-primary text-primary-foreground hover:bg-primary/90 shadow-sm text-xs font-medium"
       >

@@ -9,12 +9,21 @@ import { Badge } from "@/components/ui/badge";
 import { WorkspacesHeaderActions } from "@/components/workspaces/workspaces-header-actions";
 
 export default async function WorkspacesListPage() {
-  const { activeLab, activeLabId } = await getActiveLabContext();
+  const { user, activeLab, activeLabId, canApproveInLab } = await getActiveLabContext();
 
-  const workspaces = await prisma.workspace.findMany({
+  const workspacesRaw = await prisma.workspace.findMany({
     where: {
       labId: activeLabId,
       status: "APPROVED",
+      ...(!canApproveInLab && user
+        ? {
+            OR: [
+              { department: { not: "Espaço Individual" } },
+              { department: null },
+              { requestedById: user.id },
+            ],
+          }
+        : {}),
     },
     include: {
       _count: {
@@ -33,6 +42,12 @@ export default async function WorkspacesListPage() {
     orderBy: {
       createdAt: "desc",
     },
+  });
+
+  const workspaces = [...workspacesRaw].sort((a, b) => {
+    const aIsMine = a.department === "Espaço Individual" && a.requestedById === user?.id ? -1 : 0;
+    const bIsMine = b.department === "Espaço Individual" && b.requestedById === user?.id ? -1 : 0;
+    return aIsMine - bIsMine;
   });
 
   return (
@@ -59,9 +74,10 @@ export default async function WorkspacesListPage() {
 
       {/* Grid de Workspaces */}
       <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
-        {workspaces.map((ws) => (
+        {workspaces.map((ws, idx) => (
           <Card
             key={ws.id}
+            data-tour={idx === 0 ? "workspaces-first-card" : undefined}
             className="flex flex-col border border-border shadow-2xs hover:shadow-xs hover:border-primary/50 transition-all group"
           >
             <CardHeader className="pb-3">
@@ -109,7 +125,10 @@ export default async function WorkspacesListPage() {
               </div>
             </CardContent>
 
-            <CardFooter className="pt-0 flex gap-2">
+            <CardFooter
+              data-tour={idx === 0 ? "workspaces-card-actions" : undefined}
+              className="pt-0 flex gap-2"
+            >
               <Button
                 asChild
                 variant="outline"

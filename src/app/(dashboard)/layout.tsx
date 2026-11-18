@@ -36,10 +36,18 @@ export default async function DashboardLayout({
     platformSettings,
   ] = await Promise.all([
     prisma.workspace.findMany({
-      where: { labId: activeLabId, status: "APPROVED" },
-      select: { id: true, name: true, slug: true },
+      where: {
+        labId: activeLabId,
+        status: "APPROVED",
+        OR: [
+          { department: { not: "Espaço Individual" } },
+          { department: null },
+          { requestedById: user?.id },
+        ],
+      },
+      select: { id: true, name: true, slug: true, requestedById: true, department: true },
       orderBy: { createdAt: "asc" },
-      take: 6,
+      take: 8,
     }),
     prisma.workspace.count({
       where: { labId: activeLabId, status: "APPROVED" },

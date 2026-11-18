@@ -181,7 +181,7 @@ export function MembersManagementClient({
       </div>
 
       {/* 2. Banner de Métricas / KPIs */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+      <div data-tour="members-kpis" className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
         <Card className="border-border/80 shadow-2xs">
           <CardContent className="p-4 flex items-center justify-between">
             <div>
@@ -246,7 +246,7 @@ export function MembersManagementClient({
       </div>
 
       {/* 3. Seletor de Abas Principais */}
-      <div className="flex items-center justify-between border-b border-border">
+      <div data-tour="members-tabs" className="flex items-center justify-between border-b border-border">
         <div className="flex items-center gap-4">
           <button
             type="button"

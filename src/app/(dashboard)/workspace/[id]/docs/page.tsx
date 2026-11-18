@@ -77,6 +77,7 @@ export default async function WorkspaceDocsPage({ params }: DocsPageProps) {
       </div>
 
       {/* Lista de Documentos */}
+      <div data-tour="docs-grid">
       {workspace.documents.length === 0 ? (
         <Card className="border-dashed p-10 text-center">
           <FileText className="mx-auto h-8 w-8 text-muted-foreground/60 mb-2" />
@@ -114,6 +115,7 @@ export default async function WorkspaceDocsPage({ params }: DocsPageProps) {
           ))}
         </div>
       )}
+      </div>
     </div>
   );
 }

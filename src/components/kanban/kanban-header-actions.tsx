@@ -19,7 +19,7 @@ export function KanbanHeaderActions({ workspaceId, columns, workspaceMembers = [
 
   return (
     <div className="flex items-center gap-2">
-      <Button asChild variant="outline" size="sm" className="text-xs">
+      <Button asChild variant="outline" size="sm" className="text-xs" data-tour="kanban-docs-btn">
         <Link href={`/workspace/${workspaceId}/docs`}>
           <BookOpen className="mr-1.5 h-3.5 w-3.5 text-secondary" />
           Abrir Caderno Docs
@@ -28,6 +28,7 @@ export function KanbanHeaderActions({ workspaceId, columns, workspaceMembers = [
 
       <Button
         size="sm"
+        data-tour="kanban-new-task"
         onClick={() => setIsCreateTaskOpen(true)}
         className="text-xs bg-primary text-primary-foreground hover:bg-primary/90 font-semibold gap-1.5 shadow-xs cursor-pointer"
       >

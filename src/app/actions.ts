@@ -6,6 +6,7 @@ import { prisma } from "@/lib/prisma";
 import {
   ACTIVE_LAB_COOKIE,
   DEFAULT_LAB_ID,
+  ensurePersonalWorkspaceForUser,
   getActiveLabContext,
 } from "@/lib/lab-context";
 import type { UserRole, UserStatus } from "@/types";
@@ -267,6 +268,12 @@ export async function createLaboratory(data: CreateLaboratoryInput) {
         { labId: newLab.id, workspaceId: initialWs.id, title: "Revisão", order: 2 },
         { labId: newLab.id, workspaceId: initialWs.id, title: "Concluído", order: 3 },
       ],
+    });
+
+    await ensurePersonalWorkspaceForUser(newLab.id, {
+      id: user.id,
+      name: user.name,
+      email: user.email,
     });
 
     // Ativa automaticamente o laboratório recém-criado
@@ -540,6 +547,14 @@ export async function completeOnboarding(data: OnboardingInput) {
           approvedAt: isProfessor ? new Date() : null,
         },
       });
+
+      if (nextStatus === "ACTIVE") {
+        await ensurePersonalWorkspaceForUser(labId, {
+          id: updated.id,
+          name: updated.name,
+          email: updated.email,
+        });
+      }
     }
 
     // Define o primeiro laboratório selecionado como contexto inicial
@@ -633,7 +648,14 @@ export async function triageAndApproveUser(data: TriageInput) {
       },
     });
 
-    // 3. Vincula o usuário aos braços de pesquisa (Workspaces) selecionados daquele laboratório
+    // 3. Cria automaticamente o Workspace próprio (Espaço Individual) do usuário recém-aceito no laboratório
+    await ensurePersonalWorkspaceForUser(targetLabId, {
+      id: updatedUser.id,
+      name: updatedUser.name,
+      email: updatedUser.email,
+    });
+
+    // 4. Vincula o usuário aos braços de pesquisa (Workspaces) selecionados daquele laboratório
     if (data.workspaceIds && data.workspaceIds.length > 0) {
       for (const wsId of data.workspaceIds) {
         await prisma.workspaceMember.upsert({

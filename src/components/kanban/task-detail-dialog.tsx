@@ -399,7 +399,10 @@ export function TaskDetailDialog({
             {/* Conteúdo com Scroll */}
             <div className="flex-1 overflow-y-auto space-y-4 pr-1 text-xs">
               {/* Bloco de Ação: Apontamento de Horas Integrado na Mesma Caixa */}
-              <div className="rounded-xl border border-primary/20 dark:border-primary/40 bg-primary/5 dark:bg-primary/10 p-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-2xs">
+              <div
+                data-tour="task-modal-log-hours"
+                className="rounded-xl border border-primary/20 dark:border-primary/40 bg-primary/5 dark:bg-primary/10 p-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-2xs"
+              >
                 <div className="space-y-0.5">
                   <div className="flex items-center gap-1.5 font-bold text-primary dark:text-emerald-400 text-xs">
                     <Clock className="h-4 w-4 text-primary dark:text-emerald-400 shrink-0" />
@@ -428,7 +431,7 @@ export function TaskDetailDialog({
               </div>
 
               {/* Grid de Campos Editáveis: Bucket/Coluna, Prioridade e Prazo */}
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              <div data-tour="task-modal-fields" className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                 {/* 1. Mover de Bucket / Coluna */}
                 <div className="space-y-1 rounded-lg border border-border/70 p-2.5 bg-card">
                   <label className="text-[10px] font-semibold text-muted-foreground dark:text-zinc-300 uppercase tracking-wider flex items-center gap-1">

@@ -371,6 +371,7 @@ export function DocumentEditor({
       {/* 1. ONENOTE-INSPIRED NOTEBOOK PAGES SIDEBAR (COLLAPSIBLE)  */}
       {/* ========================================================= */}
       <aside
+        data-tour="doc-editor-sidebar"
         className={`border-r border-border bg-card/60 backdrop-blur-xs flex flex-col transition-all duration-300 ease-in-out shrink-0 z-20 ${
           isSidebarOpen ? "w-72 sm:w-80" : "w-0 overflow-hidden border-none"
         }`}
@@ -568,6 +569,7 @@ export function DocumentEditor({
             {/* Botão Salvar Explícito */}
             <Button
               size="sm"
+              data-tour="doc-editor-save"
               onClick={() => performSave()}
               disabled={saveStatus === "saving"}
               className="text-xs h-7 px-3 bg-secondary text-secondary-foreground hover:bg-secondary/90 font-semibold gap-1.5 shadow-xs"
@@ -758,7 +760,7 @@ export function DocumentEditor({
             </div>
 
             {/* Notion-style Auto-resizing Title */}
-            <div className="mb-4">
+            <div data-tour="doc-editor-header" className="mb-4">
               <input
                 type="text"
                 value={title}
@@ -792,7 +794,7 @@ export function DocumentEditor({
             </div>
 
             {/* BlockNote Interactive Rich Editor protegido por Error Boundary */}
-            <div className="prose dark:prose-invert max-w-none">
+            <div data-tour="doc-editor-canvas" className="prose dark:prose-invert max-w-none">
               <EditorErrorBoundary>
                 <BlockEditor
                   initialContent={content}

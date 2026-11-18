@@ -58,6 +58,7 @@ export default async function DocsCentralPage() {
       </div>
 
       {/* Grid de Documentos */}
+      <div data-tour="docs-grid">
       {documents.length === 0 ? (
         <Card className="border-dashed p-12 text-center bg-card/40">
           <FileText className="mx-auto h-10 w-10 text-muted-foreground/50 mb-3" />
@@ -107,6 +108,7 @@ export default async function DocsCentralPage() {
           })}
         </div>
       )}
+      </div>
     </div>
   );
 }

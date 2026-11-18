@@ -50,7 +50,7 @@ export default async function CalendarPage() {
 
       <div className="grid gap-6 lg:grid-cols-3">
         {/* Painel de Próximos Prazos / Entregas */}
-        <div className="lg:col-span-2 space-y-4">
+        <div data-tour="calendar-deadlines" className="lg:col-span-2 space-y-4">
           <Card className="border border-border shadow-2xs">
             <CardHeader className="pb-3">
               <div className="flex items-center justify-between">
@@ -103,7 +103,7 @@ export default async function CalendarPage() {
         </div>
 
         {/* Eventos Recorrentes do Laboratório */}
-        <div className="space-y-4">
+        <div data-tour="calendar-events" className="space-y-4">
           <Card className="border border-border shadow-2xs bg-card/60">
             <CardHeader className="pb-3">
               <CardTitle className="text-sm font-bold text-foreground">

@@ -89,6 +89,36 @@ export function KanbanBoard({
   // Estado do modal de detalhes / edição do card
   const [selectedTask, setSelectedTask] = useState<TaskDetailData | null>(null);
 
+  // Permite que o Tour Guiado do Kanban abra/feche automaticamente o primeiro card para demonstrar o Apontamento de Horas
+  useEffect(() => {
+    const handleOpenFirstCard = () => {
+      for (const col of columnsState) {
+        if (col.tasks.length > 0) {
+          const t = col.tasks[0];
+          setSelectedTask({
+            ...t,
+            columnId: col.id,
+            columnTitle: col.title,
+            workspaceId,
+            workspaceName,
+          });
+          return;
+        }
+      }
+    };
+
+    const handleCloseCard = () => {
+      setSelectedTask(null);
+    };
+
+    window.addEventListener("labgest:tour-open-first-card", handleOpenFirstCard);
+    window.addEventListener("labgest:tour-close-card", handleCloseCard);
+    return () => {
+      window.removeEventListener("labgest:tour-open-first-card", handleOpenFirstCard);
+      window.removeEventListener("labgest:tour-close-card", handleCloseCard);
+    };
+  }, [columnsState, workspaceId, workspaceName]);
+
   // Estado de criação de novo bucket / coluna
   const [isAddingColumn, setIsAddingColumn] = useState(false);
   const [newColumnTitle, setNewColumnTitle] = useState("");
@@ -332,17 +362,20 @@ export function KanbanBoard({
     setSelectedTask(null);
   };
 
+  const firstColumnWithTaskIndex = columnsState.findIndex((c) => c.tasks.length > 0);
+
   return (
     <>
       {/* Colunas do Kanban com Rolagem Horizontal e Altura Bounded */}
       <div className="flex gap-4 overflow-x-auto pb-6 pt-1 items-start min-h-[580px] max-h-[calc(100vh-15rem)] select-none">
-        {columnsState.map((column) => {
+        {columnsState.map((column, colIdx) => {
           const isOver = dragOverColumnId === column.id;
 
           return (
             <div
               key={column.id}
               data-column-id={column.id}
+              data-tour={colIdx === 0 ? "kanban-first-column" : undefined}
               onDragOver={(e) => handleDragOver(e, column.id)}
               onDragLeave={(e) => handleDragLeave(e, column.id)}
               onDrop={(e) => handleDrop(e, column.id)}
@@ -394,12 +427,15 @@ export function KanbanBoard({
                     {isOver ? "Solte o card aqui para mover" : "Nenhuma atividade"}
                   </div>
                 ) : (
-                  column.tasks.map((task) => {
+                  column.tasks.map((task, taskIdx) => {
                     const isDraggingThis = draggedTask?.taskId === task.id;
+                    const isFirstCardOnBoard =
+                      colIdx === firstColumnWithTaskIndex && taskIdx === 0;
 
                     return (
                       <Card
                         key={task.id}
+                        data-tour={isFirstCardOnBoard ? "kanban-first-card" : undefined}
                         draggable={true}
                         onDragStart={(e) => handleDragStart(e, task.id, column.id)}
                         onDragEnd={handleDragEnd}
@@ -570,6 +606,7 @@ export function KanbanBoard({
         ) : (
           <button
             type="button"
+            data-tour="kanban-add-column"
             onClick={() => setIsAddingColumn(true)}
             className="w-80 shrink-0 h-16 rounded-xl border-2 border-dashed border-border/80 hover:border-primary/70 hover:bg-primary/[0.03] text-muted-foreground hover:text-primary transition-all flex items-center justify-center gap-2 text-xs font-semibold group cursor-pointer shadow-2xs"
           >

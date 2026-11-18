@@ -22,6 +22,7 @@ export function DocsHeaderActions({
     <>
       <Button
         size="sm"
+        data-tour="docs-new-page-btn"
         onClick={() => setIsOpen(true)}
         className="text-xs bg-secondary text-secondary-foreground hover:bg-secondary/90 font-semibold gap-1.5 shadow-xs cursor-pointer"
       >

@@ -20,6 +20,132 @@ export function isCoordinatorEmail(email?: string | null): boolean {
 }
 
 /**
+ * Cria de forma idempotente o espaço de trabalho individual (Workspace próprio) do usuário
+ * assim que ele é aceito no laboratório, já com colunas padrão, tarefa inicial de exemplo
+ * e um caderno de anotações.
+ */
+export async function ensurePersonalWorkspaceForUser(
+  labId: string,
+  user: { id: string; name?: string | null; email?: string | null }
+) {
+  try {
+    const cleanId = user.id.replace(/[^a-zA-Z0-9]/g, "").slice(-10).toLowerCase();
+    const cleanLab = labId.replace(/[^a-zA-Z0-9-]/g, "").toLowerCase();
+    const personalSlug = `espaco-${cleanLab}-${cleanId}`;
+
+    const existing = await prisma.workspace.findFirst({
+      where: {
+        labId,
+        OR: [
+          { slug: personalSlug },
+          {
+            requestedById: user.id,
+            department: "Espaço Individual",
+          },
+        ],
+      },
+      select: { id: true },
+    });
+
+    if (existing) {
+      return existing;
+    }
+
+    const displayName = user.name?.trim() || user.email?.split("@")[0] || "Integrante";
+    const firstName = displayName.split(" ")[0];
+
+    const createdWs = await prisma.workspace.create({
+      data: {
+        labId,
+        name: `Espaço de ${displayName}`,
+        slug: personalSlug,
+        department: "Espaço Individual",
+        description: `Espaço individual de ${displayName} para organizar atividades, apontar horas e manter cadernos de estudo no laboratório.`,
+        status: "APPROVED",
+        requestedById: user.id,
+        approvedById: user.id,
+        approvedAt: new Date(),
+        members: {
+          create: {
+            userId: user.id,
+            role: "OWNER",
+          },
+        },
+      },
+    });
+
+    const colTodo = await prisma.kanbanColumn.create({
+      data: {
+        labId,
+        workspaceId: createdWs.id,
+        title: "A Fazer",
+        order: 0,
+      },
+    });
+
+    await prisma.kanbanColumn.createMany({
+      data: [
+        { labId, workspaceId: createdWs.id, title: "Em Andamento", order: 1 },
+        { labId, workspaceId: createdWs.id, title: "Em Revisão", order: 2 },
+        { labId, workspaceId: createdWs.id, title: "Concluído", order: 3 },
+      ],
+    });
+
+    await prisma.task.create({
+      data: {
+        labId,
+        workspaceId: createdWs.id,
+        columnId: colTodo.id,
+        title: "Primeiros passos: clique aqui para ver detalhes e apontar horas",
+        description:
+          "Use este cartão para testar o quadro de tarefas: altere o prazo, mude a prioridade ou clique em 'Apontar Horas' para registrar seu tempo de trabalho.",
+        priority: "MEDIUM",
+        order: 0,
+        createdById: user.id,
+        assignees: {
+          create: {
+            userId: user.id,
+          },
+        },
+      },
+    });
+
+    await prisma.document.create({
+      data: {
+        labId,
+        workspaceId: createdWs.id,
+        ownerId: user.id,
+        title: `Caderno de Anotações • ${firstName}`,
+        icon: "📓",
+        type: "WORKSPACE",
+        content: [
+          {
+            type: "heading",
+            props: { level: 2 },
+            content: [{ type: "text", text: `Bem-vindo(a) ao seu caderno, ${firstName}!`, styles: {} }],
+          },
+          {
+            type: "paragraph",
+            content: [
+              {
+                type: "text",
+                text: "Use este espaço para registrar suas anotações, reuniões e relatórios. Digite '/' em qualquer linha para inserir títulos, listas ou tabelas.",
+                styles: {},
+              },
+            ],
+          },
+        ],
+      },
+    });
+
+    return createdWs;
+  } catch (error) {
+    console.warn("[ensurePersonalWorkspaceForUser Warning]:", error);
+    return null;
+  }
+}
+
+/**
  * Garante que o laboratório inaugural (Lab CTPP) exista no banco de dados
  * e que registros legados estejam devidamente associados a ele.
  */
@@ -304,6 +430,15 @@ export async function getActiveLabContext() {
     statusInLab === "ACTIVE" && (roleInLab === "PROFESSOR" || roleInLab === "LEADER");
 
   const canManageLab = statusInLab === "ACTIVE" && roleInLab === "PROFESSOR";
+
+  // Garante que todo usuário aceito (ACTIVE) no laboratório possua seu espaço próprio (Workspace individual)
+  if (statusInLab === "ACTIVE") {
+    await ensurePersonalWorkspaceForUser(activeLab.id, {
+      id: user.id,
+      name: user.name,
+      email: user.email,
+    });
+  }
 
   return {
     user,

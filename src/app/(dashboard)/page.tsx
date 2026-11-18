@@ -74,11 +74,16 @@ export default async function DashboardPage() {
     },
   });
 
-  // C. Lista de Workspaces (Braços de pesquisa) ativos do laboratório
-  const activeWorkspaces = await prisma.workspace.findMany({
+  // C. Lista de Workspaces (Braços de pesquisa + Espaço Individual do próprio usuário) ativos do laboratório
+  const activeWorkspacesRaw = await prisma.workspace.findMany({
     where: {
       labId: activeLabId,
       status: "APPROVED",
+      OR: [
+        { department: { not: "Espaço Individual" } },
+        { department: null },
+        { requestedById: userId },
+      ],
     },
     include: {
       _count: {
@@ -92,6 +97,13 @@ export default async function DashboardPage() {
     orderBy: {
       createdAt: "desc",
     },
+  });
+
+  // Coloca o Espaço Pessoal do usuário em primeiro lugar na listagem
+  const activeWorkspaces = [...activeWorkspacesRaw].sort((a, b) => {
+    const aIsMine = a.department === "Espaço Individual" && a.requestedById === userId ? -1 : 0;
+    const bIsMine = b.department === "Espaço Individual" && b.requestedById === userId ? -1 : 0;
+    return aIsMine - bIsMine;
   });
 
   // D. Se for Responsável do Lab (PROFESSOR) ou Líder (LEADER), busca Workspaces PENDING e Pedidos de Triagem (LabMembership WAITING_APPROVAL)

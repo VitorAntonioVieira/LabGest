@@ -88,7 +88,7 @@ export default async function TimeTrackingPage() {
       </div>
 
       {/* Cartões de Indicadores */}
-      <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+      <div data-tour="timetracking-summary" className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
         <Card className="border border-border shadow-xs">
           <CardHeader className="pb-2">
             <CardTitle className="text-xs uppercase tracking-wider text-muted-foreground">
@@ -140,7 +140,7 @@ export default async function TimeTrackingPage() {
       </div>
 
       {/* Tabela de Apontamentos */}
-      <Card className="border border-border shadow-2xs">
+      <Card data-tour="timetracking-history" className="border border-border shadow-2xs">
         <CardHeader className="pb-3">
           <CardTitle className="text-sm font-bold text-foreground">
             Histórico de Apontamentos ({activeLab.name})
