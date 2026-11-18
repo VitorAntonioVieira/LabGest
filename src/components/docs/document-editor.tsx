@@ -195,10 +195,13 @@ export function DocumentEditor({
   const [isDeleting, setIsDeleting] = useState(false);
   const [copiedLink, setCopiedLink] = useState(false);
 
-  // Dark Mode Detection
+  // Dark Mode Detection & Mobile Drawer Initial State
   const [isDark, setIsDark] = useState(false);
 
   useEffect(() => {
+    if (typeof window !== "undefined" && window.innerWidth < 768) {
+      setIsSidebarOpen(false);
+    }
     const checkDark = () => {
       setIsDark(document.documentElement.classList.contains("dark"));
     };
@@ -366,14 +369,14 @@ export function DocumentEditor({
   );
 
   return (
-    <div className="flex -m-4 sm:-m-6 lg:-m-8 min-h-[calc(100vh-4rem)] bg-background">
+    <div className="relative flex -m-3.5 sm:-m-6 md:-m-8 min-h-[calc(100vh-3.5rem)] sm:min-h-[calc(100vh-4rem)] bg-background overflow-hidden">
       {/* ========================================================= */}
       {/* 1. ONENOTE-INSPIRED NOTEBOOK PAGES SIDEBAR (COLLAPSIBLE)  */}
       {/* ========================================================= */}
       <aside
         data-tour="doc-editor-sidebar"
-        className={`border-r border-border bg-card/60 backdrop-blur-xs flex flex-col transition-all duration-300 ease-in-out shrink-0 z-20 ${
-          isSidebarOpen ? "w-72 sm:w-80" : "w-0 overflow-hidden border-none"
+        className={`fixed md:relative inset-y-0 left-0 border-r border-border bg-card/95 md:bg-card/60 backdrop-blur-xs flex flex-col transition-all duration-300 ease-in-out shrink-0 z-30 ${
+          isSidebarOpen ? "w-72 sm:w-80 shadow-2xl md:shadow-none" : "w-0 overflow-hidden border-none"
         }`}
       >
         {/* Sidebar Header */}

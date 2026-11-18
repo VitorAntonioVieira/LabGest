@@ -290,11 +290,11 @@ export default async function DashboardPage() {
           </p>
         </div>
 
-        <div data-tour="dashboard-quick-actions" className="flex items-center gap-3">
+        <div data-tour="dashboard-quick-actions" className="flex flex-wrap items-center gap-2 sm:gap-3">
           <Button
             asChild
             variant="outline"
-            className="border-primary/30 text-primary hover:bg-primary/5 text-xs font-medium"
+            className="flex-1 sm:flex-initial border-primary/30 text-primary hover:bg-primary/5 text-xs font-medium"
           >
             <Link href="/docs">
               <BookOpen className="mr-1.5 h-3.5 w-3.5" />

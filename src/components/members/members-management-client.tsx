@@ -246,8 +246,8 @@ export function MembersManagementClient({
       </div>
 
       {/* 3. Seletor de Abas Principais */}
-      <div data-tour="members-tabs" className="flex items-center justify-between border-b border-border">
-        <div className="flex items-center gap-4">
+      <div data-tour="members-tabs" className="flex flex-wrap items-center justify-between gap-2 border-b border-border overflow-x-auto">
+        <div className="flex items-center gap-3 sm:gap-4 min-w-max">
           <button
             type="button"
             onClick={() => setActiveTab("members")}

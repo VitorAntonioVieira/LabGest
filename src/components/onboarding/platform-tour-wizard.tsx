@@ -431,16 +431,31 @@ export function PlatformTourWizard({
     };
   }, [pageKey]);
 
-  // Dispara eventos interativos do passo (ex: abrir automaticamente o 1º card no Kanban para mostrar "Apontar Horas")
+  // Dispara eventos interativos do passo (ex: abrir automaticamente o 1º card no Kanban ou abrir/fechar o drawer no mobile)
   useEffect(() => {
     if (!isOpen || !currentStep) return;
+
+    const isSidebarStep =
+      currentStep.id === "lab-switcher" ||
+      currentStep.id === "request-workspace" ||
+      currentStep.id.startsWith("nav-");
+
+    if (isSidebarStep) {
+      window.dispatchEvent(
+        new CustomEvent("labgest:sidebar-state", { detail: { open: true } })
+      );
+    } else if (typeof window !== "undefined" && window.innerWidth < 1024) {
+      window.dispatchEvent(
+        new CustomEvent("labgest:sidebar-state", { detail: { open: false } })
+      );
+    }
 
     if (currentStep.onEnterEvent) {
       window.dispatchEvent(new CustomEvent(currentStep.onEnterEvent));
     }
 
-    const timer1 = window.setTimeout(updateHighlightPosition, 120);
-    const timer2 = window.setTimeout(updateHighlightPosition, 320);
+    const timer1 = window.setTimeout(updateHighlightPosition, 150);
+    const timer2 = window.setTimeout(updateHighlightPosition, 350);
 
     window.addEventListener("resize", updateHighlightPosition);
     window.addEventListener("scroll", updateHighlightPosition, true);
@@ -468,6 +483,11 @@ export function PlatformTourWizard({
   const handleFinish = () => {
     if (pageKey === "kanban") {
       window.dispatchEvent(new CustomEvent("labgest:tour-close-card"));
+    }
+    if (typeof window !== "undefined" && window.innerWidth < 1024) {
+      window.dispatchEvent(
+        new CustomEvent("labgest:sidebar-state", { detail: { open: false } })
+      );
     }
     try {
       window.localStorage.setItem(getStorageKey(pageKey), "true");
@@ -498,9 +518,11 @@ export function PlatformTourWizard({
 
   if (!mounted || !isOpen || !currentStep) return null;
 
-  // Calcula posição do card explicativo ao lado do elemento destacado
+  // Calcula posição do card explicativo ao lado do elemento destacado (responsivo para mobile e desktop)
   const pad = 6;
-  const tooltipWidth = 340;
+  const vw = typeof window !== "undefined" ? window.innerWidth : 1024;
+  const vh = typeof window !== "undefined" ? window.innerHeight : 768;
+  const tooltipWidth = Math.min(340, vw - 24);
   let tooltipStyle: React.CSSProperties = {
     top: "50%",
     left: "50%",
@@ -508,26 +530,32 @@ export function PlatformTourWizard({
   };
 
   if (targetRect && typeof window !== "undefined") {
-    const vw = window.innerWidth;
-    const vh = window.innerHeight;
     const placement = currentStep.placement || "right";
 
-    if (placement === "right" && targetRect.left + targetRect.width + tooltipWidth + 24 < vw) {
+    if (
+      vw >= 768 &&
+      placement === "right" &&
+      targetRect.left + targetRect.width + tooltipWidth + 24 < vw
+    ) {
       const clampedTop = Math.max(16, Math.min(vh - 230, targetRect.top - 4));
       tooltipStyle = {
         top: `${clampedTop}px`,
         left: `${targetRect.left + targetRect.width + 16}px`,
       };
-    } else if (placement === "left" && targetRect.left - tooltipWidth - 24 > 0) {
+    } else if (
+      vw >= 768 &&
+      placement === "left" &&
+      targetRect.left - tooltipWidth - 24 > 0
+    ) {
       const clampedTop = Math.max(16, Math.min(vh - 230, targetRect.top - 4));
       tooltipStyle = {
         top: `${clampedTop}px`,
         left: `${targetRect.left - tooltipWidth - 16}px`,
       };
-    } else if (placement === "bottom" || targetRect.top + targetRect.height + 220 < vh) {
+    } else if (targetRect.top + targetRect.height + 220 < vh) {
       const clampedLeft = Math.max(
-        16,
-        Math.min(vw - tooltipWidth - 16, targetRect.left + targetRect.width / 2 - tooltipWidth / 2)
+        12,
+        Math.min(vw - tooltipWidth - 12, targetRect.left + targetRect.width / 2 - tooltipWidth / 2)
       );
       tooltipStyle = {
         top: `${Math.min(vh - 210, targetRect.top + targetRect.height + 14)}px`,
@@ -535,11 +563,11 @@ export function PlatformTourWizard({
       };
     } else {
       const clampedLeft = Math.max(
-        16,
-        Math.min(vw - tooltipWidth - 16, targetRect.left + targetRect.width / 2 - tooltipWidth / 2)
+        12,
+        Math.min(vw - tooltipWidth - 12, targetRect.left + targetRect.width / 2 - tooltipWidth / 2)
       );
       tooltipStyle = {
-        top: `${Math.max(16, targetRect.top - 205)}px`,
+        top: `${Math.max(12, targetRect.top - 205)}px`,
         left: `${clampedLeft}px`,
       };
     }

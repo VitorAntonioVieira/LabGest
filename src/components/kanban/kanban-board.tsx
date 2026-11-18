@@ -367,7 +367,7 @@ export function KanbanBoard({
   return (
     <>
       {/* Colunas do Kanban com Rolagem Horizontal e Altura Bounded */}
-      <div className="flex gap-4 overflow-x-auto pb-6 pt-1 items-start min-h-[580px] max-h-[calc(100vh-15rem)] select-none">
+      <div className="flex gap-3 sm:gap-4 overflow-x-auto pb-6 pt-1 items-start min-h-[500px] sm:min-h-[580px] max-h-[calc(100vh-13rem)] sm:max-h-[calc(100vh-15rem)] select-none snap-x snap-mandatory sm:snap-none">
         {columnsState.map((column, colIdx) => {
           const isOver = dragOverColumnId === column.id;
 
@@ -380,7 +380,7 @@ export function KanbanBoard({
               onDragLeave={(e) => handleDragLeave(e, column.id)}
               onDrop={(e) => handleDrop(e, column.id)}
               className={cn(
-                "w-80 shrink-0 flex flex-col rounded-xl border p-3 max-h-[calc(100vh-16rem)] transition-all duration-150",
+                "w-[82vw] max-w-[300px] sm:w-80 sm:max-w-none shrink-0 snap-center flex flex-col rounded-xl border p-3 max-h-[calc(100vh-14rem)] sm:max-h-[calc(100vh-16rem)] transition-all duration-150",
                 isOver
                   ? "border-primary bg-primary/[0.04] ring-2 ring-primary/30 shadow-md"
                   : "border-border/80 bg-muted/30 hover:border-border"
@@ -608,7 +608,7 @@ export function KanbanBoard({
             type="button"
             data-tour="kanban-add-column"
             onClick={() => setIsAddingColumn(true)}
-            className="w-80 shrink-0 h-16 rounded-xl border-2 border-dashed border-border/80 hover:border-primary/70 hover:bg-primary/[0.03] text-muted-foreground hover:text-primary transition-all flex items-center justify-center gap-2 text-xs font-semibold group cursor-pointer shadow-2xs"
+            className="w-[82vw] max-w-[300px] sm:w-80 sm:max-w-none shrink-0 snap-center h-16 rounded-xl border-2 border-dashed border-border/80 hover:border-primary/70 hover:bg-primary/[0.03] text-muted-foreground hover:text-primary transition-all flex items-center justify-center gap-2 text-xs font-semibold group cursor-pointer shadow-2xs"
           >
             <div className="h-6 w-6 rounded-full bg-muted group-hover:bg-primary/10 flex items-center justify-center transition-colors">
               <Plus className="h-3.5 w-3.5 text-muted-foreground group-hover:text-primary transition-colors" />

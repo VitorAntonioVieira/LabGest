@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { signOut, useSession } from "next-auth/react";
 import { Search, Bell, Moon, Sun, LogOut, Compass } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -9,6 +9,33 @@ export function Header() {
   const { data: session } = useSession();
   const [isDark, setIsDark] = useState(false);
   const [isProfileMenuOpen, setIsProfileMenuOpen] = useState(false);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(true);
+
+  useEffect(() => {
+    // Em telas mobile (< 1024px), inicia o drawer fechado; no desktop inicia aberto
+    const isDesktop = window.innerWidth >= 1024;
+    setIsSidebarOpen(isDesktop);
+
+    const handleSidebarSync = (e: Event) => {
+      const customEvent = e as CustomEvent<{ open: boolean }>;
+      if (typeof customEvent.detail?.open === "boolean") {
+        setIsSidebarOpen(customEvent.detail.open);
+      }
+    };
+
+    window.addEventListener("labgest:sidebar-state", handleSidebarSync);
+    return () => {
+      window.removeEventListener("labgest:sidebar-state", handleSidebarSync);
+    };
+  }, []);
+
+  const toggleSidebar = () => {
+    const next = !isSidebarOpen;
+    setIsSidebarOpen(next);
+    window.dispatchEvent(
+      new CustomEvent("labgest:sidebar-state", { detail: { open: next } })
+    );
+  };
 
   const openTourWizard = () => {
     setIsProfileMenuOpen(false);
@@ -25,122 +52,149 @@ export function Header() {
   };
 
   return (
-    <>
-      <header className="flex h-16 w-full shrink-0 items-center justify-between border-b border-border bg-card/90 px-6 backdrop-blur transition-all">
-        {/* 1. Barra de Busca Estilo Notion / Linear */}
-        <div className="flex items-center gap-3">
-          <div className="relative w-72 md:w-96">
-            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-            <input
-              type="text"
-              placeholder="Buscar tarefas, notas, braços de pesquisa... (Ctrl + K)"
-              className="h-9 w-full rounded-md border border-input bg-card pl-9 pr-12 text-xs text-foreground placeholder:text-muted-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary shadow-xs transition-colors"
+    <header className="flex h-14 sm:h-16 w-full shrink-0 items-center justify-between gap-2 border-b border-border bg-card/90 px-3 sm:px-6 backdrop-blur transition-all z-30">
+      {/* 1. Botão Hamburguer Animado (☰ <-> X) + Barra de Busca Responsiva */}
+      <div className="flex items-center gap-2 sm:gap-3 flex-1 min-w-0">
+        <button
+          type="button"
+          onClick={toggleSidebar}
+          aria-label={isSidebarOpen ? "Fechar menu lateral" : "Abrir menu lateral"}
+          title={isSidebarOpen ? "Recolher menu lateral" : "Abrir menu lateral"}
+          className="relative flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-border/80 bg-background/80 text-foreground hover:bg-accent hover:border-primary/40 transition-colors cursor-pointer focus:outline-none focus:ring-2 focus:ring-primary/30"
+        >
+          <div className="relative h-4 w-4 flex items-center justify-center">
+            <span
+              className={`absolute h-0.5 w-4 rounded-full bg-current transition-all duration-300 ease-in-out ${
+                isSidebarOpen ? "translate-y-0 rotate-45" : "-translate-y-1.5 rotate-0"
+              }`}
             />
-            <kbd className="absolute right-2.5 top-1/2 -translate-y-1/2 rounded border border-border bg-muted px-1.5 py-0.5 text-[10px] font-mono text-muted-foreground">
-              ⌘K
-            </kbd>
+            <span
+              className={`absolute h-0.5 w-4 rounded-full bg-current transition-all duration-300 ease-in-out ${
+                isSidebarOpen ? "opacity-0 scale-x-0" : "opacity-100 scale-x-100"
+              }`}
+            />
+            <span
+              className={`absolute h-0.5 w-4 rounded-full bg-current transition-all duration-300 ease-in-out ${
+                isSidebarOpen ? "translate-y-0 -rotate-45" : "translate-y-1.5 rotate-0"
+              }`}
+            />
           </div>
+        </button>
+
+        <div className="relative flex-1 max-w-[200px] sm:max-w-xs md:max-w-md">
+          <Search className="absolute left-2.5 sm:left-3 top-1/2 h-3.5 w-3.5 sm:h-4 sm:w-4 -translate-y-1/2 text-muted-foreground" />
+          <input
+            type="text"
+            placeholder="Buscar tarefas, notas..."
+            className="h-8 sm:h-9 w-full rounded-md border border-input bg-card pl-8 sm:pl-9 pr-3 sm:pr-12 text-xs text-foreground placeholder:text-muted-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary shadow-xs transition-colors"
+          />
+          <kbd className="hidden sm:inline-block absolute right-2.5 top-1/2 -translate-y-1/2 rounded border border-border bg-muted px-1.5 py-0.5 text-[10px] font-mono text-muted-foreground">
+            ⌘K
+          </kbd>
         </div>
+      </div>
 
-        {/* 2. Ações Rápidas */}
-        <div className="flex items-center gap-3">
-          {/* Guia Interativo da Plataforma */}
+      {/* 2. Ações Rápidas */}
+      <div className="flex items-center gap-1.5 sm:gap-2.5 shrink-0">
+        {/* Guia Interativo da Plataforma */}
+        <button
+          type="button"
+          data-tour="header-tour-btn"
+          onClick={openTourWizard}
+          className="flex items-center gap-1.5 rounded-lg border border-primary/25 bg-primary/10 px-2 sm:px-2.5 py-1.5 text-xs font-semibold text-primary hover:bg-primary/20 transition-colors cursor-pointer"
+          title="Ver tour desta tela"
+        >
+          <Compass className="h-3.5 w-3.5 shrink-0" />
+          <span className="hidden md:inline">Tour Guiado</span>
+        </button>
+
+        {/* Notificações */}
+        <button
+          type="button"
+          className="relative rounded-md p-1.5 sm:p-2 text-muted-foreground hover:bg-accent hover:text-foreground transition-colors"
+          title="Notificações"
+        >
+          <Bell className="h-4 w-4" />
+          <span className="absolute top-1.5 right-1.5 flex h-2 w-2">
+            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-secondary opacity-75"></span>
+            <span className="relative inline-flex rounded-full h-2 w-2 bg-secondary"></span>
+          </span>
+        </button>
+
+        {/* Toggle Dark Mode */}
+        <button
+          type="button"
+          onClick={toggleDarkMode}
+          className="rounded-md p-1.5 sm:p-2 text-muted-foreground hover:bg-accent hover:text-foreground transition-colors"
+          title="Alternar Tema"
+        >
+          {isDark ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
+        </button>
+
+        {/* Perfil & Menu com Logout */}
+        <div className="relative">
           <button
             type="button"
-            data-tour="header-tour-btn"
-            onClick={openTourWizard}
-            className="flex items-center gap-1.5 rounded-lg border border-primary/25 bg-primary/10 px-2.5 py-1.5 text-xs font-semibold text-primary hover:bg-primary/20 transition-colors"
-            title="Ver tour pela plataforma"
+            onClick={() => setIsProfileMenuOpen(!isProfileMenuOpen)}
+            className="flex items-center gap-2 rounded-full focus:outline-none focus:ring-2 focus:ring-primary/40"
           >
-            <Compass className="h-3.5 w-3.5" />
-            <span className="hidden sm:inline">Tour Guiado</span>
+            <Avatar className="h-8 w-8 border border-border">
+              <AvatarImage
+                src={session?.user?.image || undefined}
+                alt={session?.user?.name || "Usuário"}
+              />
+              <AvatarFallback className="bg-primary/10 text-primary font-bold text-xs">
+                {session?.user?.name
+                  ? session.user.name
+                      .split(" ")
+                      .map((n) => n[0])
+                      .slice(0, 2)
+                      .join("")
+                  : "UN"}
+              </AvatarFallback>
+            </Avatar>
           </button>
 
-          {/* Notificações */}
-          <button
-            type="button"
-            className="relative rounded-md p-2 text-muted-foreground hover:bg-accent hover:text-foreground transition-colors"
-            title="Notificações"
-          >
-            <Bell className="h-4 w-4" />
-            <span className="absolute top-1.5 right-1.5 flex h-2 w-2">
-              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-secondary opacity-75"></span>
-              <span className="relative inline-flex rounded-full h-2 w-2 bg-secondary"></span>
-            </span>
-          </button>
-
-          {/* Toggle Dark Mode */}
-          <button
-            type="button"
-            onClick={toggleDarkMode}
-            className="rounded-md p-2 text-muted-foreground hover:bg-accent hover:text-foreground transition-colors"
-            title="Alternar Tema"
-          >
-            {isDark ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
-          </button>
-
-          {/* Perfil & Menu com Logout */}
-          <div className="relative">
-            <button
-              type="button"
-              onClick={() => setIsProfileMenuOpen(!isProfileMenuOpen)}
-              className="flex items-center gap-2 rounded-full focus:outline-none focus:ring-2 focus:ring-primary/40"
-            >
-              <Avatar className="h-8 w-8 border border-border">
-                <AvatarImage src={session?.user?.image || undefined} alt={session?.user?.name || "Usuário"} />
-                <AvatarFallback className="bg-primary/10 text-primary font-bold text-xs">
-                  {session?.user?.name
-                    ? session.user.name
-                        .split(" ")
-                        .map((n) => n[0])
-                        .slice(0, 2)
-                        .join("")
-                    : "UN"}
-                </AvatarFallback>
-              </Avatar>
-            </button>
-
-            {isProfileMenuOpen && (
-              <div className="absolute right-0 mt-2 w-56 rounded-xl border border-border bg-card p-2 shadow-xl animate-in fade-in zoom-in-95 duration-100 z-50">
-                <div className="px-3 py-2 border-b border-border/60">
-                  <p className="text-xs font-bold text-foreground truncate">
-                    {session?.user?.name || "Integrante"}
-                  </p>
-                  <p className="text-[10px] text-muted-foreground truncate font-mono">
-                    {session?.user?.email}
-                  </p>
-                  <span className="inline-block mt-1 text-[9px] font-semibold uppercase px-1.5 py-0.5 rounded bg-primary/10 text-primary">
-                    {session?.user?.role === "PROFESSOR"
-                      ? "Professor"
-                      : session?.user?.role === "LEADER"
-                      ? "Líder (Gestão)"
-                      : "Integrante"}
-                  </span>
-                </div>
-
-                <div className="pt-1 space-y-0.5">
-                  <button
-                    type="button"
-                    onClick={openTourWizard}
-                    className="w-full flex items-center gap-2 px-3 py-2 text-xs text-foreground hover:bg-muted rounded-lg transition-colors font-medium"
-                  >
-                    <Compass className="h-3.5 w-3.5 text-primary" />
-                    <span>Tour Guiado da Plataforma</span>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => signOut({ callbackUrl: "/login" })}
-                    className="w-full flex items-center gap-2 px-3 py-2 text-xs text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/40 rounded-lg transition-colors font-medium"
-                  >
-                    <LogOut className="h-3.5 w-3.5" />
-                    <span>Sair da Conta (Logout)</span>
-                  </button>
-                </div>
+          {isProfileMenuOpen && (
+            <div className="absolute right-0 mt-2 w-56 rounded-xl border border-border bg-card p-2 shadow-xl animate-in fade-in zoom-in-95 duration-100 z-50">
+              <div className="px-3 py-2 border-b border-border/60">
+                <p className="text-xs font-bold text-foreground truncate">
+                  {session?.user?.name || "Integrante"}
+                </p>
+                <p className="text-[10px] text-muted-foreground truncate font-mono">
+                  {session?.user?.email}
+                </p>
+                <span className="inline-block mt-1 text-[9px] font-semibold uppercase px-1.5 py-0.5 rounded bg-primary/10 text-primary">
+                  {session?.user?.role === "PROFESSOR"
+                    ? "Professor"
+                    : session?.user?.role === "LEADER"
+                    ? "Líder (Gestão)"
+                    : "Integrante"}
+                </span>
               </div>
-            )}
-          </div>
+
+              <div className="pt-1 space-y-0.5">
+                <button
+                  type="button"
+                  onClick={openTourWizard}
+                  className="w-full flex items-center gap-2 px-3 py-2 text-xs text-foreground hover:bg-muted rounded-lg transition-colors font-medium"
+                >
+                  <Compass className="h-3.5 w-3.5 text-primary" />
+                  <span>Tour Guiado desta Tela</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => signOut({ callbackUrl: "/login" })}
+                  className="w-full flex items-center gap-2 px-3 py-2 text-xs text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/40 rounded-lg transition-colors font-medium"
+                >
+                  <LogOut className="h-3.5 w-3.5" />
+                  <span>Sair da Conta (Logout)</span>
+                </button>
+              </div>
+            </div>
+          )}
         </div>
-      </header>
-    </>
+      </div>
+    </header>
   );
 }

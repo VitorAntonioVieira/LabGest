@@ -99,8 +99,8 @@ export default async function DashboardLayout({
       {/* Conteúdo Principal com Barra Superior e Scroll Independente */}
       <div className="flex flex-1 flex-col h-full overflow-hidden min-w-0">
         <Header />
-        <main className="flex-1 overflow-y-auto p-6 md:p-8 min-h-0">
-          <div className="max-w-7xl w-full mx-auto space-y-8">
+        <main className="flex-1 overflow-y-auto overflow-x-hidden p-3.5 sm:p-6 md:p-8 min-h-0">
+          <div className="max-w-7xl w-full mx-auto space-y-6 sm:space-y-8">
             {children}
           </div>
         </main>
