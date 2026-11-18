@@ -176,6 +176,10 @@ stateDiagram-v2
   - [x] Exibição pós-login de todos os laboratórios disponíveis para acesso (`/labs`) nos quais o usuário já foi homologado, além de seletor rápido na Sidebar.
   - [x] Triagem e homologação de solicitações (`LabMembership` em `WAITING_APPROVAL`) acessível tanto pelo **Responsável do Laboratório (`PROFESSOR`)** quanto pelos **Líderes (`LEADER`)** daquele laboratório (`/admin/approvals` e Dashboard).
   - [x] Isolamento de White-label (`PlatformSettings`) por laboratório ativo na sessão (`labgest_active_lab`).
+- [x] **Wizard Interativo de Primeiro Login (`PlatformTourWizard`):**
+  - [x] Abertura automática no primeiro acesso do usuário (`user.hasCompletedTour === false`) e botão permanente `"Guia da Plataforma"` no Header e no portal `/labs`.
+  - [x] Tutorial passo a passo interativo em 7 etapas cobrindo todas as ferramentas: Portal Multi-Laboratórios, Dashboard Acadêmico, Espaços de Trabalho (Workspaces), Quadros Kanban Dinâmicos, Apontamento de Horas (40h/mês), Cadernos Científicos (Notion/OneNote) e Controle de Integrantes, Calendário & Triagem.
+  - [x] Persistência de conclusão via Server Action `completePlatformTour` (`prisma/schema.prisma` -> `User.hasCompletedTour`) e fallback em `localStorage`.
 
 ---
 

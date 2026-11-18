@@ -35,9 +35,11 @@ import {
   Send,
   X,
   Palette,
+  Compass,
 } from "lucide-react";
 import type { LaboratorySummary, UserRole } from "@/types";
 import { ROLE_LABELS } from "@/types";
+import { PlatformTourWizard } from "@/components/onboarding/platform-tour-wizard";
 
 interface LabSelectorClientProps {
   user: {
@@ -46,6 +48,7 @@ interface LabSelectorClientProps {
     email: string | null;
     image: string | null;
     role: UserRole;
+    hasCompletedTour?: boolean;
   };
   activeLabId: string;
   laboratories: LaboratorySummary[];
@@ -197,6 +200,17 @@ export function LabSelectorClient({
                 </p>
               </div>
             </div>
+
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => window.dispatchEvent(new CustomEvent("labgest:open-tour"))}
+              className="text-xs h-9 gap-1.5 font-semibold border-primary/30 text-primary hover:bg-primary/10"
+            >
+              <Compass className="h-3.5 w-3.5" />
+              <span>Guia da Plataforma</span>
+            </Button>
 
             {user.role === "PROFESSOR" && (
               <Button
@@ -655,6 +669,15 @@ export function LabSelectorClient({
           </section>
         )}
       </div>
+
+      {/* Wizard Interativo de Boas-Vindas no Primeiro Login */}
+      <PlatformTourWizard
+        userId={user.id}
+        userName={user.name || "Integrante UNIFESP"}
+        userRole={user.role}
+        labName="LabGest UNIFESP"
+        hasCompletedTour={Boolean(user.hasCompletedTour)}
+      />
     </div>
   );
 }

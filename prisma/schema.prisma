@@ -182,9 +182,10 @@ model User {
   status        UserStatus  @default(PENDING) // Controle global de onboarding inicial
   academicId    String?     // Matrícula / RA Unifesp
   phone         String?     // WhatsApp / Telefone de contato
-  course        String?     // Curso / Programa de Pós-Graduação
-  bio           String?     @db.Text
-  createdAt     DateTime    @default(now())
+  course           String?     // Curso / Programa de Pós-Graduação
+  bio              String?     @db.Text
+  hasCompletedTour Boolean     @default(false) // Controle do Wizard de 1º acesso na plataforma
+  createdAt        DateTime    @default(now())
   updatedAt     DateTime    @updatedAt
 
   // Auditoria da aprovação global/legada de membros

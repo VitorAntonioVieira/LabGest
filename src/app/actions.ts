@@ -1686,3 +1686,24 @@ export async function updateMemberRoleAndAttributions(data: {
     throw new Error("Erro ao atualizar o integrante no laboratório.");
   }
 }
+
+/**
+ * Marca o Wizard / Tour de primeiro acesso da plataforma como concluído para o usuário autenticado
+ */
+export async function completePlatformTour() {
+  const { user } = await getActiveLabContext();
+  if (!user) return { success: false };
+
+  try {
+    await prisma.user.update({
+      where: { id: user.id },
+      data: { hasCompletedTour: true },
+    });
+    revalidatePath("/", "layout");
+    return { success: true };
+  } catch (error) {
+    console.error("[completePlatformTour Error]:", error);
+    return { success: false };
+  }
+}
+

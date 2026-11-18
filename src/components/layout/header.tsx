@@ -2,13 +2,18 @@
 
 import React, { useState } from "react";
 import { signOut, useSession } from "next-auth/react";
-import { Search, Bell, Moon, Sun, LogOut } from "lucide-react";
+import { Search, Bell, Moon, Sun, LogOut, Compass } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 
 export function Header() {
   const { data: session } = useSession();
   const [isDark, setIsDark] = useState(false);
   const [isProfileMenuOpen, setIsProfileMenuOpen] = useState(false);
+
+  const openTourWizard = () => {
+    setIsProfileMenuOpen(false);
+    window.dispatchEvent(new CustomEvent("labgest:open-tour"));
+  };
 
   const toggleDarkMode = () => {
     setIsDark(!isDark);
@@ -39,6 +44,16 @@ export function Header() {
 
         {/* 2. Ações Rápidas */}
         <div className="flex items-center gap-3">
+          {/* Guia Interativo / Wizard da Plataforma */}
+          <button
+            type="button"
+            onClick={openTourWizard}
+            className="flex items-center gap-1.5 rounded-lg border border-primary/25 bg-primary/10 px-2.5 py-1.5 text-xs font-semibold text-primary hover:bg-primary/20 transition-colors"
+            title="Abrir Guia Interativo das Ferramentas (Tour)"
+          >
+            <Compass className="h-3.5 w-3.5" />
+            <span className="hidden sm:inline">Guia da Plataforma</span>
+          </button>
 
           {/* Notificações */}
           <button
@@ -102,7 +117,15 @@ export function Header() {
                   </span>
                 </div>
 
-                <div className="pt-1">
+                <div className="pt-1 space-y-0.5">
+                  <button
+                    type="button"
+                    onClick={openTourWizard}
+                    className="w-full flex items-center gap-2 px-3 py-2 text-xs text-foreground hover:bg-muted rounded-lg transition-colors font-medium"
+                  >
+                    <Compass className="h-3.5 w-3.5 text-primary" />
+                    <span>Tour Guiado da Plataforma</span>
+                  </button>
                   <button
                     type="button"
                     onClick={() => signOut({ callbackUrl: "/login" })}

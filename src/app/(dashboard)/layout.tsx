@@ -5,6 +5,7 @@ import { getActiveLabContext } from "@/lib/lab-context";
 import { getPlatformSettings } from "@/lib/settings";
 import { Sidebar } from "@/components/layout/sidebar";
 import { Header } from "@/components/layout/header";
+import { PlatformTourWizard } from "@/components/onboarding/platform-tour-wizard";
 
 export default async function DashboardLayout({
   children,
@@ -96,6 +97,15 @@ export default async function DashboardLayout({
           </div>
         </main>
       </div>
+
+      {/* Wizard Interativo de Boas-Vindas no Primeiro Login (e sob demanda no Header) */}
+      <PlatformTourWizard
+        userId={user?.id}
+        userName={user?.name || "Integrante UNIFESP"}
+        userRole={roleInLab}
+        labName={platformSettings.labName}
+        hasCompletedTour={Boolean(user?.hasCompletedTour)}
+      />
     </div>
   );
 }

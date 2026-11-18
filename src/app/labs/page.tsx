@@ -25,6 +25,7 @@ export default async function LabsHubPage() {
         email: user.email,
         image: user.image,
         role: user.role,
+        hasCompletedTour: Boolean(user.hasCompletedTour),
       }}
       activeLabId={activeLabId}
       laboratories={allLaboratories as any}
