@@ -3,6 +3,7 @@ import { Inter } from "next/font/google";
 import "./globals.css";
 
 import { AuthProvider } from "@/components/providers/session-provider";
+import { SplashScreen } from "@/components/layout/splash-screen";
 import { getPlatformSettings } from "@/lib/settings";
 import { hexToHsl, hexToDarkHsl } from "@/lib/colors";
 
@@ -47,8 +48,10 @@ export default async function RootLayout({
   return (
     <html lang="pt-BR" className={`${inter.variable} ${inter.className}`} suppressHydrationWarning>
       <head>
-        {/* Favicon Dinâmico da White-label */}
+        {/* Favicon Dinâmico da White-label & Ícone da Splash Screen / PWA */}
         <link rel="icon" href={settings.faviconUrl || "/favicon.ico"} />
+        <link rel="apple-touch-icon" href="/splash-icon.png" />
+        <link rel="manifest" href="/manifest.json" />
 
         {/* Preconnect e Carregamento Robusto do Google Fonts (Inter, Outfit, Plus Jakarta Sans) */}
         <link rel="preconnect" href="https://fonts.googleapis.com" />
@@ -84,6 +87,7 @@ export default async function RootLayout({
         />
       </head>
       <body className={`${inter.variable} ${inter.className} font-sans antialiased bg-background text-foreground min-h-screen`}>
+        <SplashScreen />
         <AuthProvider>{children}</AuthProvider>
       </body>
     </html>
